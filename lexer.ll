@@ -1,5 +1,5 @@
 %option c++
-%option noyywrap
+%option noyywrap nodefault
 %{
 	#include "grammar.tab.hh"
 	#include "lexer.h"
@@ -7,37 +7,48 @@
 %}
 %option yyclass="yy::Lexer"
 
-num	"-?[1-9][0-9]*"
-id	"[a-zA-Z_][a-zA-Z_0-9]*"
+wc	[ \t\r]
+num	([1-9][0-9]*)|"0"
+id	[a-zA-Z_][a-zA-Z_0-9]*
 
 %%
-"+"	return yy::parser::token::PLUS;
-"-"	return yy::parser::token::MINUS;
-"*"	return yy::parser::token::STAR;
-"/"	return yy::parser::token::SLASH;
-"=="	return yy::parser::token::EQ;
-"!="	return yy::parser::token::NEQ;
-"<="	return yy::parser::token::LE;
-">="	return yy::parser::token::GE;
-"="	return yy::parser::token::ASSIGN;
-"!"	return yy::parser::token::EXCL;
-"<"	return yy::parser::token::LT;
-">"	return yy::parser::token::GT;
-"?"	return yy::parser::token::QMARK;
-"print"	return yy::parser::token::PRINT;
-"while" return yy::parser::token::WHILE;
-"{"	return yy::parser::token::LBRACE;
-"}"	return yy::parser::token::RBRACE;
-"("	return yy::parser::token::LPAR;
-")"	return yy::parser::token::RPAR;
-";"	return yy::parser::token::SEMICOLON;
-{num}	{
+{wc}+	yyloc->step();
+\n+	yyloc->lines(YYLeng()); yyloc->step();
+"+"	return yy::parser::token::TOK_PLUS;
+"-"	return yy::parser::token::TOK_MINUS;
+"*"	return yy::parser::token::TOK_STAR;
+"/"	return yy::parser::token::TOK_SLASH;
+"=="	return yy::parser::token::TOK_EQ;
+"!="	return yy::parser::token::TOK_NEQ;
+"<="	return yy::parser::token::TOK_LE;
+">="	return yy::parser::token::TOK_GE;
+"="	return yy::parser::token::TOK_ASSIGN;
+"!"	return yy::parser::token::TOK_EXCL;
+"<"	return yy::parser::token::TOK_LT;
+">"	return yy::parser::token::TOK_GT;
+"?"	return yy::parser::token::TOK_QMARK;
+"print"	return yy::parser::token::TOK_PRINT;
+"while" return yy::parser::token::TOK_WHILE;
+"{"	return yy::parser::token::TOK_LBRACE;
+"}"	return yy::parser::token::TOK_RBRACE;
+"("	return yy::parser::token::TOK_LPAR;
+")"	return yy::parser::token::TOK_RPAR;
+";"	return yy::parser::token::TOK_SEMICOLON;
+{num} {
 		*yylval = AST::makeExprInt(std::stoi(YYText()));
-		return yy::parser::token::NUM;
+		return yy::parser::token::TOK_NUM;
 	}
 {id}	{
 		*yylval = AST::makeExprId(YYText());
-		return yy::parser::token::ID;
+		return yy::parser::token::TOK_ID;
 	}
-<<EOF>>	return yy::parser::token::YYEOF;
+.	return yy::parser::token::TOK_YYerror;
+<<EOF>>	return yy::parser::token::TOK_YYEOF;
 %%
+/*int main() {
+	yy::Lexer lex(&std::cin);
+	yy::parser::semantic_type node;
+	int res;
+	while ( res = lex.yylex(&node))
+		std::cout << res << ' ';
+}*/

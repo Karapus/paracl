@@ -1,16 +1,19 @@
+#pragma once
 #include <iostream>
 #include <map>
 #include <typeinfo>
+#include <cassert>
 #include "inode.h"
 
-using namespace AST;
+namespace AST {
 using VarsT = std::map<std::string, int>;
 
-class AST::INode {
+class INode {
 	public:
 	INode *parent_ = nullptr;
 public:
-	virtual ~INode() = 0;
+	virtual ~INode()
+	{}
 	void set_parent(INode *new_p) {
 		parent_ = new_p;
 	}
@@ -45,12 +48,20 @@ public:
 	Blocks *tail;
 	Blocks(Block *h, Blocks *t) : head(h), tail(t)
 	{
-		head->set_parent(this);
-		tail->set_parent(this);
+		if (head)
+			head->set_parent(this);
+		if (tail)
+			tail->set_parent(this);
+	}
+	~Blocks() {
+		delete head;
+		delete tail;
 	}
 	void exec() override {
-		head->exec();
-		tail->exec();
+		if (head)
+			head->exec();
+		if (tail)
+			tail->exec();
 	}
 };
 
@@ -59,10 +70,15 @@ public:
 	VarsT vars;
 	Blocks *blocks;
 	Scope(Blocks *b) : blocks(b) {
-		blocks->set_parent(this);
+		if (blocks)
+			blocks->set_parent(this);
+	}
+	~Scope() {
+		delete blocks;
 	}
 	void exec() override {
-		blocks->exec();
+		if (blocks)
+			blocks->exec();
 	}
 };
 
@@ -71,6 +87,9 @@ public:
 	Expr *expr;
 	StmExpr(Expr *e) : expr(e) {
 		expr->set_parent(this);
+	}
+	~StmExpr() {
+		delete expr;
 	}
 	void exec() override {
 		expr->eval();
@@ -82,6 +101,9 @@ public:
 	Expr *expr;
 	StmPrint(Expr *e) : expr(e) {
 		expr->set_parent(this);
+	}
+	~StmPrint() {
+		delete expr;
 	}
 	void exec() {
 		std::cout << expr->eval() << std::endl;
@@ -95,6 +117,10 @@ public:
 	StmWhile(Expr *e, Block *b) : expr(e), block(b) {
 		expr->set_parent(this);
 		block->set_parent(this);
+	}
+	~StmWhile() {
+		delete expr;
+		delete block;
 	}
 	void exec() {
 		while (expr->eval())
@@ -142,6 +168,10 @@ public:
 		id->set_parent(this);
 		expr->set_parent(this);
 	}
+	~ExprAssign() {
+		delete id;
+		delete expr;
+	}
 	int eval() override {
 		int val = expr->eval();
 		for (INode *node = parent_; node; node = node->parent_)
@@ -161,6 +191,11 @@ public:
 		lhs->set_parent(this);
 		rhs->set_parent(this);
 	}
+	~ExprBinOp() {
+		delete op;
+		delete lhs;
+		delete rhs;
+	}
 	int eval() override {
 		return (*op)(lhs, rhs);
 	}
@@ -173,6 +208,10 @@ public:
 	ExprUnOp(UnOp *o, Expr *r) : op(o), rhs(r) {
 		op->set_parent(this);
 		rhs->set_parent(this);
+	}
+	~ExprUnOp() {
+		delete op;
+		delete rhs;
 	}
 	int eval() override {
 		return (*op)(rhs);
@@ -259,3 +298,4 @@ public:
 		return !rhs->eval();
 	}
 };
+}

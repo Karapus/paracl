@@ -6,11 +6,10 @@ class INode;
 INode *makeExprInt(int num);
 INode *makeExprId(std::string name);
 
-INode *makeScopes(INode *stm, INode *stms);
-INode *makeScopesTerm();
+INode *makeScope(INode *blocks);
 
-INode *makeScopeStm(INode *stm);
-INode *makeScopeBraces(INode *scope);
+INode *makeBlocks(INode *head, INode *tail);
+INode *makeBlocksTerm();
 
 INode *makeStmExpr(INode *expr);
 INode *makeStmDecl(INode *id, INode *expr);
@@ -18,6 +17,7 @@ INode *makeStmPrint(INode *expr);
 INode *makeStmWhile(INode *expr, INode *scope);
 
 INode *makeExprBinop(INode *binop, INode *lhs, INode *rhs);
+INode *makeExprAssign(INode *id, INode *val);
 INode *makeExprUnop(INode *unop, INode *expr);
 INode *makeExprQmark();
 
@@ -31,7 +31,6 @@ INode *makeBinOpLessOrEq();
 INode *makeBinOpGrtrOrEq();
 INode *makeBinOpEqual();
 INode *makeBinOpNotEqual();
-INode *makeBinOpAssign();
 
 INode *makeUnOpPlus();
 INode *makeUnOpMinus();

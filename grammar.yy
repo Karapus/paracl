@@ -1,22 +1,30 @@
 %language "c++"
 %require "3.2"
+%defines
+%locations
 
 %code requires {
 	namespace yy {
-		class Lexer;
+		class Driver;
 	}
 	#include "inode.h"
 }
 
+%define api.token.raw
 %define api.value.type {AST::INode *}
-%parse-param { Lexer &lexer }
+%parse-param { Driver &driver }
 
 %code {
-	#include "lexer.h"
+	#include "driver.h"
 	#undef	yylex
-	#define	yylex lexer.yylex
+	#define	yylex driver.lexer.yylex
 }
 
+%define parse.trace
+%define parse.error detailed
+%define parse.lac full
+
+%define api.token.prefix {TOK_}
 %token
 	PLUS
 	MINUS
@@ -38,8 +46,9 @@
 	LPAR
 	RPAR
 	SEMICOLON
-%token NUM
-%token ID
+	NUM
+	ID
+;
 
 %right ASSIGN
 %left EQ NEQ LE GE LT GT
@@ -47,21 +56,24 @@
 %left STAR SLASH
 %precedence UNOP EXCL
 
-%start scope
+%start program
 %%
-
-scope	: blocks	{ $$ = AST::makeScope($1);	}
-
-blocks	: block blocks	{ $$ = AST::makeBlocks($1, $2);	}
-	| %empty	{ $$ = AST::makeBlockTerm(); 	}
+program : scope		{ driver.yylval = $1; }
 ;
 
-block	: stm SEMICOLON		{ $$ = $1;			}
+scope	: blocks	{ $$ = AST::makeScope($1);	}
+;
+
+blocks	: blocks block	{ $$ = AST::makeBlocks($1, $2);	}
+	| %empty	{ $$ = AST::makeBlocksTerm(); 	}
+;
+
+block	: stm			{ $$ = $1;			}
 	| LBRACE scope RBRACE	{ $$ = AST::makeScope($2);	}
 ;
 
-stm	: expr				{ $$ = AST::makeStmExpr($1);		}
-	| PRINT expr			{ $$ = AST::makeStmPrint($2);		}
+stm	: expr	SEMICOLON		{ $$ = AST::makeStmExpr($1);		}
+	| PRINT expr SEMICOLON		{ $$ = AST::makeStmPrint($2);		}
 	| WHILE LPAR expr RPAR block	{ $$ = AST::makeStmWhile($3, $5);	}
 ;
 
@@ -92,6 +104,6 @@ unop	: PLUS	%prec UNOP	{ $$ = AST::makeUnOpPlus();	}
 ;
 %%
 
-void yy::parser::error(const std::string &err_message) {
-	std::cerr << "Error: " << err_message << std::endl;
+void yy::parser::error(const location_type &loc, const std::string &err_message) {
+	std::cerr << "Error: " << err_message << " at " << loc << std::endl;
 }
