@@ -29,6 +29,8 @@ id	[a-zA-Z_][a-zA-Z_0-9]*
 "?"	return yy::parser::token::TOK_QMARK;
 "print"	return yy::parser::token::TOK_PRINT;
 "while" return yy::parser::token::TOK_WHILE;
+"if"	return yy::parser::token::TOK_IF;
+"else"	return yy::parser::token::TOK_ELSE;
 "{"	return yy::parser::token::TOK_LBRACE;
 "}"	return yy::parser::token::TOK_RBRACE;
 "("	return yy::parser::token::TOK_LPAR;
@@ -44,11 +46,5 @@ id	[a-zA-Z_][a-zA-Z_0-9]*
 	}
 .	return yy::parser::token::TOK_YYerror;
 <<EOF>>	return yy::parser::token::TOK_YYEOF;
+
 %%
-/*int main() {
-	yy::Lexer lex(&std::cin);
-	yy::parser::semantic_type node;
-	int res;
-	while ( res = lex.yylex(&node))
-		std::cout << res << ' ';
-}*/

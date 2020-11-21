@@ -17,7 +17,7 @@ class Lexer : public yyFlexLexer
 	using FlexLexer::yylex;
 	yy::parser::token_kind_type yylex(yy::parser::semantic_type *yylval,
 			yy::location *yyloc);
-	Lexer(std::istream *is)
+	Lexer(std::istream *in) : yyFlexLexer(in)
 	{}
 };
 }

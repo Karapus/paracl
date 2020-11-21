@@ -41,6 +41,8 @@
 	QMARK
 	PRINT
 	WHILE
+	IF
+	ELSE
 	LBRACE
 	RBRACE
 	LPAR
@@ -72,9 +74,11 @@ block	: stm			{ $$ = $1;			}
 	| LBRACE scope RBRACE	{ $$ = AST::makeScope($2);	}
 ;
 
-stm	: expr	SEMICOLON		{ $$ = AST::makeStmExpr($1);		}
-	| PRINT expr SEMICOLON		{ $$ = AST::makeStmPrint($2);		}
-	| WHILE LPAR expr RPAR block	{ $$ = AST::makeStmWhile($3, $5);	}
+stm	: expr	SEMICOLON			{ $$ = AST::makeStmExpr($1);		}
+	| PRINT expr SEMICOLON			{ $$ = AST::makeStmPrint($2);		}
+	| WHILE LPAR expr RPAR block		{ $$ = AST::makeStmWhile($3, $5);	}
+	| IF LPAR expr RPAR block		{ $$ = AST::makeStmIf($3, $5);		}
+	| IF LPAR expr RPAR block ELSE block	{ $$ = AST::makeStmIf($3, $5, $7);	}
 ;
 
 expr	: LPAR expr RPAR	{ $$ = $2; 				}

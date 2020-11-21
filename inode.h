@@ -12,9 +12,9 @@ INode *makeBlocks(INode *head, INode *tail);
 INode *makeBlocksTerm();
 
 INode *makeStmExpr(INode *expr);
-INode *makeStmDecl(INode *id, INode *expr);
 INode *makeStmPrint(INode *expr);
 INode *makeStmWhile(INode *expr, INode *scope);
+INode *makeStmIf(INode *expr, INode *true_block, INode *false_block = nullptr);
 
 INode *makeExprBinop(INode *binop, INode *lhs, INode *rhs);
 INode *makeExprAssign(INode *id, INode *val);

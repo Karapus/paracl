@@ -128,6 +128,30 @@ public:
 	}
 };
 
+class StmIf : public Stm {
+public:
+	Expr *expr;
+	Block *true_block;
+	Block *false_block;
+	StmIf(Expr *e, Block *tb, Block *fb) : expr(e), true_block(tb), false_block(fb) {
+		expr->set_parent(this);
+		true_block->set_parent(this);
+		if (false_block)
+			false_block->set_parent(this);
+	}
+	~StmIf() {
+		delete expr;
+		delete true_block;
+		delete false_block;
+	}
+	void exec() {
+		if (expr->eval())
+			true_block->exec();
+		else if (false_block)
+			false_block->exec();
+	}
+};
+
 class ExprInt : public Expr {
 public:
 	int val;
@@ -145,8 +169,12 @@ public:
 	{}
 	int eval() override {
 		for (INode *node = parent_; node; node = node->parent_)
-			if (typeid(*node) == typeid(Scope))
-				return static_cast<Scope *>(node)->vars[name];
+			if (typeid(*node) == typeid(Scope)) {
+				try {
+					return static_cast<Scope *>(node)->vars.at(name);
+				} catch (std::out_of_range) {
+				}
+			}
 		return 0;
 	}
 	//rvlaue / lvalue difference
@@ -176,8 +204,20 @@ public:
 		int val = expr->eval();
 		for (INode *node = parent_; node; node = node->parent_)
 			if (typeid(*node) == typeid(Scope))
-				static_cast<Scope *>(node)->vars[id->name] = val;
+				try {
+					static_cast<Scope *>(node)->vars.at(id->name) = val;
+				} catch (std::out_of_range) {
+					if (!node->parent_) {
+						static_cast<Scope *>(getScope())->vars[id->name] = val;
+					}
+				}
 		return val;
+	}
+	INode *getScope() {
+		auto scope = parent_;
+		for (; typeid(*scope) != typeid(Scope); scope = scope->parent_)
+			{}
+		return scope; 
 	}
 };
 
