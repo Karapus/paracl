@@ -52,11 +52,12 @@
 	ID
 ;
 
+/*%right RBRACE ELSE*/
 %right ASSIGN
 %left EQ NEQ LE GE LT GT
 %left PLUS MINUS
 %left STAR SLASH
-%precedence UNOP EXCL
+%precedence UNOP
 
 %start program
 %%
@@ -82,9 +83,9 @@ stm	: expr	SEMICOLON			{ $$ = AST::makeStmExpr($1);		}
 ;
 
 expr	: LPAR expr RPAR	{ $$ = $2; 				}
-	| expr binop expr	{ $$ = AST::makeExprBinop($2, $1, $3);	}
+	| expr binop expr 	{ $$ = AST::makeExprBinop($2, $1, $3);	}
 	| ID ASSIGN expr	{ $$ = AST::makeExprAssign($1, $3);	}
-	| unop expr		{ $$ = AST::makeExprUnop($1, $2);	}
+	| unop expr %prec UNOP	{ $$ = AST::makeExprUnop($1, $2);	}
 	| NUM			{ $$ = $1;				}
 	| ID			{ $$ = $1;				}
 	| QMARK			{ $$ = AST::makeExprQmark();		}
@@ -102,9 +103,9 @@ binop	: STAR		{ $$ = AST::makeBinOpMul();		}
 	| NEQ		{ $$ = AST::makeBinOpNotEqual();	}
 ;
 
-unop	: PLUS	%prec UNOP	{ $$ = AST::makeUnOpPlus();	}
-	| MINUS	%prec UNOP	{ $$ = AST::makeUnOpMinus();	}
-	| EXCL			{ $$ = AST::makeUnOpNot();	}
+unop	: PLUS		{ $$ = AST::makeUnOpPlus();	}
+	| MINUS		{ $$ = AST::makeUnOpMinus();	}
+	| EXCL		{ $$ = AST::makeUnOpNot();	}
 ;
 %%
 
