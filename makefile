@@ -9,11 +9,12 @@ lex.o: lex.yy.cc grammar.tab.cc
 lex.yy.cc: lexer.ll
 	flex $<
 grammar.tab.cc: grammar.yy
-	bison -dv -Wall -rall grammar.yy
+	bison -v -Wall -rall grammar.yy
 grammar.o: grammar.tab.cc
 	g++ $(CFLAGS) -c $< -o $@
 inode.o: inode.cc inode.h
 	g++ $(CFLAGS) -c $< -o $@
 clean:
-	rm -f *.o
-	rm -f lex.yy.cc grammar.tab.*
+	rm -f *.o *.out
+	rm -f lex.yy.cc grammar.tab.* grammar.output location.hh
+	rm -f vgcore.*

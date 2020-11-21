@@ -4,6 +4,7 @@
 	#include "grammar.tab.hh"
 	#include "lexer.h"
 	#include <string>
+	#define YY_USER_ACTION yyloc->columns(YYLeng());
 %}
 %option yyclass="yy::Lexer"
 
@@ -12,6 +13,11 @@ num	([1-9][0-9]*)|"0"
 id	[a-zA-Z_][a-zA-Z_0-9]*
 
 %%
+
+%{
+	yyloc->step();
+%}
+
 {wc}+	yyloc->step();
 \n+	yyloc->lines(YYLeng()); yyloc->step();
 "+"	return yy::parser::token::TOK_PLUS;
