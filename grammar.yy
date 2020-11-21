@@ -52,7 +52,6 @@
 	ID
 ;
 
-/*%right RBRACE ELSE*/
 %right ASSIGN
 %left EQ NEQ LE GE LT GT
 %left PLUS MINUS
@@ -83,24 +82,21 @@ stm	: expr	SEMICOLON			{ $$ = AST::makeStmExpr($1);		}
 ;
 
 expr	: LPAR expr RPAR	{ $$ = $2; 				}
-	| expr binop expr 	{ $$ = AST::makeExprBinop($2, $1, $3);	}
 	| ID ASSIGN expr	{ $$ = AST::makeExprAssign($1, $3);	}
 	| unop expr %prec UNOP	{ $$ = AST::makeExprUnop($1, $2);	}
 	| NUM			{ $$ = $1;				}
 	| ID			{ $$ = $1;				}
 	| QMARK			{ $$ = AST::makeExprQmark();		}
-;
-
-binop	: STAR		{ $$ = AST::makeBinOpMul();		}
-	| SLASH		{ $$ = AST::makeBinOpDiv();		}
-	| PLUS		{ $$ = AST::makeBinOpPlus();		}
-	| MINUS		{ $$ = AST::makeBinOpMinus();		}
-	| LT		{ $$ = AST::makeBinOpLess();		}
-	| GT		{ $$ = AST::makeBinOpGrtr();		}
-	| LE		{ $$ = AST::makeBinOpLessOrEq();	}
-	| GE		{ $$ = AST::makeBinOpGrtrOrEq();	}
-	| EQ		{ $$ = AST::makeBinOpEqual();		}
-	| NEQ		{ $$ = AST::makeBinOpNotEqual();	}
+	| expr STAR	{ $$ = AST::makeBinOpMul();	} expr { $$ = AST::makeExprBinop($3, $1, $4); }
+	| expr SLASH	{ $$ = AST::makeBinOpDiv();	} expr { $$ = AST::makeExprBinop($3, $1, $4); }
+	| expr PLUS	{ $$ = AST::makeBinOpPlus();	} expr { $$ = AST::makeExprBinop($3, $1, $4); }
+	| expr MINUS	{ $$ = AST::makeBinOpMinus();	} expr { $$ = AST::makeExprBinop($3, $1, $4); }
+	| expr LT	{ $$ = AST::makeBinOpLess();	} expr { $$ = AST::makeExprBinop($3, $1, $4); }
+	| expr GT	{ $$ = AST::makeBinOpGrtr();	} expr { $$ = AST::makeExprBinop($3, $1, $4); }
+	| expr LE	{ $$ = AST::makeBinOpLessOrEq();} expr { $$ = AST::makeExprBinop($3, $1, $4); }
+	| expr GE	{ $$ = AST::makeBinOpGrtrOrEq();} expr { $$ = AST::makeExprBinop($3, $1, $4); }
+	| expr EQ	{ $$ = AST::makeBinOpEqual();	} expr { $$ = AST::makeExprBinop($3, $1, $4); }
+	| expr NEQ	{ $$ = AST::makeBinOpNotEqual();} expr { $$ = AST::makeExprBinop($3, $1, $4); }
 ;
 
 unop	: PLUS		{ $$ = AST::makeUnOpPlus();	}
