@@ -1,0 +1,6 @@
+if (?)
+	print 1;
+else if (?)
+	print 2;
+else
+	print 3;

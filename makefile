@@ -1,18 +1,18 @@
-$CFLAGS+=-O0 -Wall -Wextra -g
+$CFLAGS=-O0 -Wall -Wextra -g
 all: driver.out
-driver.out: grammar.o lex.o inode.o driver.o
-	g++ $? -o $@
-driver.o: driver.cc
+driver.out: driver.o grammar.o lex.o inode.o
+	g++ $(CFLAGS) $? -o $@
+driver.o: driver.cc driver.h grammar.tab.hh inode.h location.hh lexer.h ast.h
 	g++ $(CFLAGS) -c $< -o $@
-lex.o: lex.yy.cc grammar.tab.cc
+lex.o: lex.yy.cc grammar.tab.hh inode.h location.hh lexer.h
 	g++ $(CFLAGS) -c $< -o $@
 lex.yy.cc: lexer.ll
 	flex $<
-grammar.tab.cc: grammar.yy
+grammar.tab.hh: grammar.yy
 	bison -v -Wall -rall grammar.yy
-grammar.o: grammar.tab.cc
+grammar.o: grammar.tab.cc grammar.tab.hh inode.h location.hh driver.h lexer.h ast.h
 	g++ $(CFLAGS) -c $< -o $@
-inode.o: inode.cc inode.h
+inode.o: inode.cc inode.h ast.h
 	g++ $(CFLAGS) -c $< -o $@
 clean:
 	rm -f *.o *.out

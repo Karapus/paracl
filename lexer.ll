@@ -50,7 +50,7 @@ id	[a-zA-Z_][a-zA-Z_0-9]*
 		*yylval = AST::makeExprId(YYText());
 		return yy::parser::token::TOK_ID;
 	}
-.	return yy::parser::token::TOK_YYerror;
+.	throw yy::parser::syntax_error(*yyloc, "invalid character: " + std::string(YYText()));
 <<EOF>>	return yy::parser::token::TOK_YYEOF;
 
 %%

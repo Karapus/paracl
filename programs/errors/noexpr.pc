@@ -1,0 +1,6 @@
+if ()
+	print 1;
+else
+	print 0;
+print ;
+print ();

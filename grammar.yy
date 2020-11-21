@@ -13,7 +13,6 @@
 %define api.token.raw
 %define api.value.type {AST::INode *}
 %parse-param { Driver &driver }
-
 %code {
 	#include "driver.h"
 	#undef	yylex
@@ -50,7 +49,8 @@
 	SEMICOLON
 	NUM
 	ID
-;
+
+%destructor { delete $$; } NUM ID scope blocks block stm expr unop
 
 %right ELSE THEN
 %right ASSIGN
@@ -72,11 +72,12 @@ blocks	: blocks block	{ $$ = AST::makeBlocks($1, $2);	}
 ;
 
 block	: stm			{ $$ = $1;			}
-	| LBRACE scope RBRACE	{ $$ = AST::makeScope($2);	}
+	| LBRACE scope RBRACE	{ $$ = $2;			}
+	| error
 ;
 
 stm	: SEMICOLON					{ $$ = AST::makeBlocksTerm();		}
-  	| expr	SEMICOLON				{ $$ = AST::makeStmExpr($1);		}
+	| expr	SEMICOLON				{ $$ = AST::makeStmExpr($1);		}
 	| PRINT expr SEMICOLON				{ $$ = AST::makeStmPrint($2);		}
 	| WHILE LPAR expr RPAR block			{ $$ = AST::makeStmWhile($3, $5);	}
 	| IF LPAR expr RPAR block	%prec THEN	{ $$ = AST::makeStmIf($3, $5);		}

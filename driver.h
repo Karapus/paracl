@@ -8,14 +8,12 @@ class Driver final {
 	public:
 	Lexer lexer;
 	AST::INode *yylval;
-//	yy::location yyloc;
-	Driver(std::istream *is) :
-		lexer(is)
+	Driver(std::istream *is) : lexer(is), yylval(nullptr)
 	{}
 	AST::INode *parse() {
 		yy::parser parser{*this};
-		//parser.set_debug_level(trace_parsing);
-		parser();
+		if (parser())
+			return nullptr;
 		return yylval;
 	}
 };
