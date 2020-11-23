@@ -1,7 +1,11 @@
 #pragma once
 #include <string>
 namespace AST {
-class INode;
+class INode {
+public:
+	virtual ~INode()
+	{}
+};
 
 INode *makeExprInt(int num);
 INode *makeExprId(std::string name);

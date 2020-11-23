@@ -7,6 +7,6 @@ int main(int argc, char **argv) {
 	yy::Driver driver{&code_file};
 	AST::INode *root = driver.parse();
 	if (root)
-		static_cast<AST::Scope *>(root)->exec();
+		static_cast<AST::IExecable *>(root)->exec();
 	delete root;
 }
