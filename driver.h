@@ -1,6 +1,5 @@
 #include "grammar.tab.hh"
 #include "lexer.h"
-#include "exec.h"
 #include <iostream>
 
 namespace yy {

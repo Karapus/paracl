@@ -1,10 +1,9 @@
 #pragma once
+#include "inode.h"
+#include "exec.h"
 #include <iostream>
 #include <map>
 #include <typeinfo>
-#include <cassert>
-#include "inode.h"
-#include "exec.h"
 
 namespace AST {
 using VarsT = std::map<std::string, int>;

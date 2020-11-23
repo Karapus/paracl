@@ -1,4 +1,3 @@
-#include "inode.h"
 #include "ast.h"
 using namespace AST;
 INode *AST::makeExprInt(int num) {
