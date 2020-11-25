@@ -5,6 +5,7 @@
 	#include "lexer.h"
 	#include <string>
 	#define YY_USER_ACTION yyloc->columns(YYLeng());
+	#define YY_TERMINATE return 
 %}
 %option yyclass="yy::Lexer"
 
@@ -51,6 +52,5 @@ id	[a-zA-Z_][a-zA-Z_0-9]*
 		return yy::parser::token::TOK_ID;
 	}
 .	throw yy::parser::syntax_error(*yyloc, "invalid character: " + std::string(YYText()));
-<<EOF>>	return yy::parser::token::TOK_YYEOF;
-
+<<EOF>>	return yy::parser::token::TOK_END;
 %%

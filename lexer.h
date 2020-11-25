@@ -6,7 +6,7 @@
 
 #undef	YY_DECL
 #define	YY_DECL	\
-	yy::parser::token_kind_type yy::Lexer::yylex(yy::parser::semantic_type *yylval, \
+	yy::parser::token::yytokentype yy::Lexer::yylex(yy::parser::semantic_type *yylval, \
 			yy::location *yyloc)
 
 
@@ -15,7 +15,7 @@ class Lexer : public yyFlexLexer
 {
 	public:
 	using FlexLexer::yylex;
-	yy::parser::token_kind_type yylex(yy::parser::semantic_type *yylval,
+	yy::parser::token::yytokentype yylex(yy::parser::semantic_type *yylval,
 			yy::location *yyloc);
 	Lexer(std::istream *in) : yyFlexLexer(in)
 	{}

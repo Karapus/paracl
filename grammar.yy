@@ -20,11 +20,12 @@
 }
 
 %define parse.trace
-%define parse.error detailed
+%define parse.error verbose
 %define parse.lac full
 
 %define api.token.prefix {TOK_}
 %token
+	END	0
 	PLUS
 	MINUS
 	STAR
@@ -61,7 +62,7 @@
 
 %start program
 %%
-program : scope		{ driver.yylval = $1; }
+program : scope	END	{ driver.yylval = $1; }
 ;
 
 scope	: blocks	{ $$ = AST::makeScope($1);	}
