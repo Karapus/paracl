@@ -200,16 +200,16 @@ public:
 					static_cast<Scope *>(node)->vars.at(id->name) = val;
 				} catch (std::out_of_range) {
 					if (!node->parent) {
-						static_cast<Scope *>(getScope())->vars[id->name] = val;
+						getScope()->vars[id->name] = val;
 					}
 				}
 		return val;
 	}
-	Node *getScope() {
+	Scope *getScope() {
 		auto scope = parent;
 		for (; typeid(*scope) != typeid(Scope); scope = scope->parent)
 			{}
-		return scope; 
+		return static_cast<Scope *>(scope);
 	}
 };
 

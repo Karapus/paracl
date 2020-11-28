@@ -72,9 +72,9 @@ blocks	: blocks block	{ $$ = AST::makeBlocks($1, $2);	}
 	| %empty	{ $$ = AST::makeBlocksTerm(); 	}
 ;
 
-block	: stm			{ $$ = $1;			}
-	| LBRACE scope RBRACE	{ $$ = $2;			}
-	| error
+block	: stm			{ $$ = $1;	}
+	| LBRACE scope RBRACE	{ $$ = $2;	}
+	| error			{ $$ = AST::makeScope(AST::makeBlocksTerm());	}
 ;
 
 stm	: SEMICOLON					{ $$ = AST::makeBlocksTerm();		}
