@@ -1,8 +1,7 @@
 #pragma once
 #include <string>
 namespace AST {
-class INode {
-public:
+struct INode {
 	virtual ~INode()
 	{}
 };

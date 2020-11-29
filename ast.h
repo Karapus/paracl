@@ -8,35 +8,30 @@
 namespace AST {
 using VarsT = std::map<std::string, int>;
 
-class Node {
-public:
+struct Node {
 	Node *parent = nullptr;
 	virtual ~Node() {};
 };
 
-class Block : public Node, public IExecable {
+struct Block : public Node, public IExecable {
 };
 
-class Expr : public Node, public INode {
-public:
+struct Expr : public Node, public INode {
 	virtual int eval() = 0;
 };
 
-class BinOp : public Node, public INode {
-public:
+struct BinOp : public Node, public INode {
 	virtual int operator() (Expr *lhs, Expr *rhs) = 0;
 };
 
-class UnOp : public Node, public INode {
-public:
+struct UnOp : public Node, public INode {
 	virtual int operator() (Expr *rhs) = 0;
 };
 
-class Stm : public Block {
+struct Stm : public Block {
 };
 
-class Blocks : public Block {
-public:
+struct Blocks : public Block {
 	Block *head;
 	Blocks *tail;
 	Blocks(Block *h, Blocks *t) : head(h), tail(t)
@@ -58,8 +53,7 @@ public:
 	}
 };
 
-class Scope : public Block {
-public:
+struct Scope : public Block {
 	VarsT vars;
 	Blocks *blocks;
 	Scope(Blocks *b) : blocks(b) {
@@ -75,8 +69,7 @@ public:
 	}
 };
 
-class StmExpr : public Stm {
-public:
+struct StmExpr : public Stm {
 	Expr *expr;
 	StmExpr(Expr *e) : expr(e) {
 		expr->parent = this;
@@ -89,8 +82,7 @@ public:
 	}
 };
 
-class StmPrint : public Stm {
-public:
+struct StmPrint : public Stm {
 	Expr *expr;
 	StmPrint(Expr *e) : expr(e) {
 		expr->parent = this;
@@ -103,8 +95,7 @@ public:
 	}
 };
 
-class StmWhile : public Stm {
-public:
+struct StmWhile : public Stm {
 	Expr *expr;
 	Block *block;
 	StmWhile(Expr *e, Block *b) : expr(e), block(b) {
@@ -121,8 +112,7 @@ public:
 	}
 };
 
-class StmIf : public Stm {
-public:
+struct StmIf : public Stm {
 	Expr *expr;
 	Block *true_block;
 	Block *false_block;
@@ -145,8 +135,7 @@ public:
 	}
 };
 
-class ExprInt : public Expr {
-public:
+struct ExprInt : public Expr {
 	int val;
 	ExprInt(int i) : val(i)
 	{}
@@ -155,8 +144,7 @@ public:
 	}
 };
 
-class ExprId : public Expr {
-public:
+struct ExprId : public Expr {
 	std::string name;
 	ExprId(std::string n) : name(n)
 	{}
@@ -172,16 +160,14 @@ public:
 	}
 };
 
-class ExprQmark : public Expr {
-public:
+struct ExprQmark : public Expr {
 	int eval() override {
 		int val;
 		std::cin >> val;
 		return val;
 	}
 };
-class ExprAssign : public Expr {
-public:
+struct ExprAssign : public Expr {
 	ExprId *id;
 	Expr *expr;
 	ExprAssign(ExprId *i, Expr *e) : id(i), expr(e) {
@@ -213,8 +199,7 @@ public:
 	}
 };
 
-class ExprBinOp : public Expr {
-public:
+struct ExprBinOp : public Expr {
 	BinOp *op;
 	Expr *lhs;
 	Expr *rhs;
@@ -233,8 +218,7 @@ public:
 	}
 };
 
-class ExprUnOp : public Expr {
-public:
+struct ExprUnOp : public Expr {
 	UnOp *op;
 	Expr *rhs;
 	ExprUnOp(UnOp *o, Expr *r) : op(o), rhs(r) {
@@ -250,82 +234,69 @@ public:
 	}
 };
 
-class BinOpMul : public BinOp {
-public:
+struct BinOpMul : public BinOp {
 	int operator() (Expr *lhs, Expr *rhs) override {
 		return lhs->eval() * rhs->eval();
 	}
 };
 
-class BinOpDiv : public BinOp {
-public:
+struct BinOpDiv : public BinOp {
 	int operator() (Expr *lhs, Expr *rhs) override {
 		return lhs->eval() / rhs->eval();
 	}
 };
-class BinOpPlus : public BinOp {
-public:
+struct BinOpPlus : public BinOp {
 	int operator() (Expr *lhs, Expr *rhs) override {
 		return lhs->eval() + rhs->eval();
 	}
 };
-class BinOpMinus : public BinOp {
-public:
+struct BinOpMinus : public BinOp {
 	int operator() (Expr *lhs, Expr *rhs) override {
 		return lhs->eval() - rhs->eval();
 	}
 };
-class BinOpLess : public BinOp {
-public:
+struct BinOpLess : public BinOp {
 	int operator() (Expr *lhs, Expr *rhs) override {
 		return lhs->eval() < rhs->eval();
 	}
 };
-class BinOpGrtr : public BinOp {
-public:
+struct BinOpGrtr : public BinOp {
 	int operator() (Expr *lhs, Expr *rhs) override {
 		return lhs->eval() > rhs->eval();
 	}
 };
-class BinOpLessOrEq : public BinOp {
-public:
+struct BinOpLessOrEq : public BinOp {
 	int operator() (Expr *lhs, Expr *rhs) override {
 		return lhs->eval() <= rhs->eval();
 	}
 };
-class BinOpGrtrOrEq : public BinOp {
-public:
+struct BinOpGrtrOrEq : public BinOp {
 	int operator() (Expr *lhs, Expr *rhs) override {
 		return lhs->eval() >= rhs->eval();
 	}
 };
-class BinOpEqual : public BinOp {
-public:
+struct BinOpEqual : public BinOp {
 	int operator() (Expr *lhs, Expr *rhs) override {
 		return lhs->eval() == rhs->eval();
 	}
 };
-class BinOpNotEqual : public BinOp {
-public:
+struct BinOpNotEqual : public BinOp {
 	int operator() (Expr *lhs, Expr *rhs) override {
 		return lhs->eval() != rhs->eval();
 	}
 };
 
-class UnOpPlus : public UnOp {
-public:
+struct UnOpPlus : public UnOp {
 	int operator() (Expr *rhs) override {
 		return +rhs->eval();
 	}
 };
-class UnOpMinus : public UnOp {
-public:
+struct UnOpMinus : public UnOp {
 	int operator() (Expr *rhs) override {
 		return -rhs->eval();
 	}
 };
-class UnOpNot : public UnOp {
-public:
+struct UnOpNot : public UnOp {
 	int operator() (Expr *rhs) override {
 		return !rhs->eval();
 	}

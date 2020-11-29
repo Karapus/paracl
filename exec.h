@@ -2,8 +2,7 @@
 #include "inode.h"
 namespace AST {
 
-class IExecable : public INode {
-public:
+struct IExecable : public INode {
 	virtual void exec() = 0;
 };
 

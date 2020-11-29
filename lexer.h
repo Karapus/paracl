@@ -11,9 +11,8 @@
 
 
 namespace yy {
-class Lexer : public yyFlexLexer
+struct Lexer : public yyFlexLexer
 {
-	public:
 	using FlexLexer::yylex;
 	yy::parser::token::yytokentype yylex(yy::parser::semantic_type *yylval,
 			yy::location *yyloc);

@@ -4,8 +4,7 @@
 #include <iostream>
 
 namespace yy {
-class Driver final {
-	public:
+struct Driver final {
 	Lexer lexer;
 	AST::INode *yylval;
 	Driver(std::istream *is) : lexer(is), yylval(nullptr)
