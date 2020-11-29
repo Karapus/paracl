@@ -10,7 +10,7 @@ lex.yy.cc: lexer.ll
 	flex $<
 grammar.tab.hh: grammar.yy
 	bison -v -Wall -rall grammar.yy
-grammar.o: grammar.tab.cc grammar.tab.hh inode.h location.hh driver.h lexer.h
+grammar.o: grammar.tab.cc grammar.tab.hh inode.h location.hh driver.h lexer.h exec.h
 	g++ $(CFLAGS) -c $< -o $@
 inode.o: inode.cc ast.h inode.h exec.h
 	g++ $(CFLAGS) -c $< -o $@
