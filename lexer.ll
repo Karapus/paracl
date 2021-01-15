@@ -38,6 +38,7 @@ id	[a-zA-Z_][a-zA-Z_0-9]*
 "while" return yy::parser::token::TOK_WHILE;
 "if"	return yy::parser::token::TOK_IF;
 "else"	return yy::parser::token::TOK_ELSE;
+"func"	return yy::parser::token::TOK_FUNC;
 "{"	return yy::parser::token::TOK_LBRACE;
 "}"	return yy::parser::token::TOK_RBRACE;
 "("	return yy::parser::token::TOK_LPAR;

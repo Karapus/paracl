@@ -1,5 +1,5 @@
 #pragma once
-#include "inode.h"
+#include "inode.hh"
 namespace AST {
 
 struct IExecable : public INode {

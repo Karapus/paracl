@@ -1,4 +1,5 @@
-#include "ast.h"
+#include "ast.hh"
+#include "inode.hh"
 using namespace AST;
 INode *AST::makeExprInt(int num) {
 	return new ExprInt{num};
@@ -17,7 +18,6 @@ INode *AST::makeBlocks(INode *head, INode *tail) {
 INode *AST::makeBlocksTerm() {
 	return nullptr;
 }
-
 INode *AST::makeStmExpr(INode *expr) {
 	return new StmExpr{static_cast<Expr *>(expr)};
 }
@@ -83,4 +83,33 @@ INode *AST::makeUnOpMinus() {
 }
 INode *AST::makeUnOpNot() {
 	 return new UnOpNot{};
+}
+
+INode *AST::makeExprApply(INode *id, INode *ops) {
+	return new ExprApply{static_cast<ExprId *>(id), static_cast<ExprList *>(ops)};
+}
+INode *AST::makeFunc(INode *scope, INode *declist) {
+	return new Func{static_cast<Scope *>(scope), static_cast<Declist *>(declist)};
+}
+INode *AST::makeFunc(INode *scope, INode *declist, INode *id) {
+	return new Func{static_cast<Scope *>(scope), static_cast<Declist *>(declist), static_cast<ExprId *>(id)};
+}
+
+INode *AST::makeDeclist(INode *declist, INode *id) {
+	static_cast<Declist *>(declist)->push_front(static_cast<ExprId *>(id)->name);
+	delete id;
+	return declist;
+}
+
+INode *AST::makeDeclistTerm() {
+	return new Declist{};
+}
+
+INode *AST::makeExprlist(INode *exprlist, INode *expr) {
+	static_cast<ExprList *>(exprlist)->push_front(static_cast<Expr *>(expr));
+	return exprlist;
+}
+
+INode *AST::makeExprlistTerm() {
+	return new ExprList{};
 }

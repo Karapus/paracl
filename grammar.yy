@@ -7,7 +7,7 @@
 	namespace yy {
 		class Driver;
 	}
-	#include "inode.h"
+	#include "inode.hh"
 }
 
 %define api.token.raw
@@ -43,13 +43,18 @@
 	WHILE
 	IF
 	ELSE
+	FUNC
 	LBRACE
 	RBRACE
 	LPAR
 	RPAR
 	SEMICOLON
+	COLON
+	COMA
 	NUM
 	ID
+	FUNCTION
+	RETURN
 
 %destructor { delete $$; } NUM ID scope blocks block stm expr unop
 
@@ -72,21 +77,22 @@ blocks	: blocks block	{ $$ = AST::makeBlocks($1, $2);	}
 	| %empty	{ $$ = AST::makeBlocksTerm(); 	}
 ;
 
-block	: stm			{ $$ = $1;	}
-	| LBRACE scope RBRACE	{ $$ = $2;	}
+block	: stm			{ $$ = $1;					}
 	| error			{ $$ = AST::makeScope(AST::makeBlocksTerm());	}
 ;
 
 stm	: SEMICOLON					{ $$ = AST::makeBlocksTerm();		}
 	| expr	SEMICOLON				{ $$ = AST::makeStmExpr($1);		}
+	| func						{ $$ = $1;				}
 	| PRINT expr SEMICOLON				{ $$ = AST::makeStmPrint($2);		}
-	| WHILE LPAR expr RPAR block			{ $$ = AST::makeStmWhile($3, $5);	}
-	| IF LPAR expr RPAR block	%prec THEN	{ $$ = AST::makeStmIf($3, $5);		}
-	| IF LPAR expr RPAR block ELSE block		{ $$ = AST::makeStmIf($3, $5, $7);	}
+	| WHILE LPAR expr RPAR func			{ $$ = AST::makeStmWhile($3, $5);	}
+	| IF LPAR expr RPAR func	%prec THEN	{ $$ = AST::makeStmIf($3, $5);		}
+	| IF LPAR expr RPAR func ELSE func		{ $$ = AST::makeStmIf($3, $5, $7);	}
 ;
 
 expr	: LPAR expr RPAR	{ $$ = $2; 				}
 	| ID ASSIGN expr	{ $$ = AST::makeExprAssign($1, $3);	}
+	| ID applist		{ $$ = AST::makeExprApply($1, $2);	}
 	| unop expr %prec UNOP	{ $$ = AST::makeExprUnop($1, $2);	}
 	| NUM			{ $$ = $1;				}
 	| ID			{ $$ = $1;				}
@@ -107,6 +113,28 @@ unop	: PLUS		{ $$ = AST::makeUnOpPlus();	}
 	| MINUS		{ $$ = AST::makeUnOpMinus();	}
 	| EXCL		{ $$ = AST::makeUnOpNot();	}
 ;
+
+func	: LBRACE scope RBRACE				{ $$ = AST::makeFunc($2);		}
+	| FUNC declist LBRACE scope RBRACE		{ $$ = AST::makeFunc($4, $2);		}
+	| FUNC declist COLON ID LBRACE scope RBRACE	{ $$ = AST::makeFunc($6, $2, $4);	}
+;
+
+declist	: LPAR decls RPAR	{ $$ = $2;			}
+	| LPAR RPAR		{ $$ = AST::makeDeclistTerm();	}
+;
+
+decls	: decls COMA ID	{ $$ = AST::makeDeclist($1, $3);		}
+	| ID		{ $$ = AST::makeDeclist(AST::makeDeclistTerm(), $1);	}
+;
+
+applist	: LPAR exprs RPAR	{ $$ = $2;			}
+	| LPAR RPAR		{ $$ = AST::makeExprlistTerm();	}
+;
+
+exprs	: exprs COMA expr	{ $$ = AST::makeExprlist($1, $3);			}
+	| expr			{ $$ = AST::makeExprlist(AST::makeExprlistTerm(), $1);	}
+;
+
 %%
 
 void yy::parser::error(const location_type &loc, const std::string &err_message) {
