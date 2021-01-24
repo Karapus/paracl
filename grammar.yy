@@ -56,7 +56,7 @@
 	FUNCTION
 	RETURN
 
-%destructor { delete $$; } NUM ID scope blocks block stm expr unop
+%destructor { delete $$; } NUM ID scope stm expr unop
 
 %right ELSE THEN
 %right ASSIGN
@@ -70,24 +70,24 @@
 program : scope	END	{ driver.yylval = $1; }
 ;
 
-scope	: blocks	{ $$ = AST::makeScope($1);	}
+scope   : blocks        { $$ = AST::makeScope($1);      }
 ;
 
-blocks	: blocks block	{ $$ = AST::makeBlocks($1, $2);	}
-	| %empty	{ $$ = AST::makeBlocksTerm(); 	}
+blocks	: blocks block	{ $$ = AST::makeBlocks($1, $2); }
+        | %empty	{ $$ = AST::makeBlocksTerm();   }
+        | error		{ $$ = AST::makeBlocksTerm();   }
 ;
 
-block	: stm			{ $$ = $1;					}
-	| error			{ $$ = AST::makeScope(AST::makeBlocksTerm());	}
+block	: stm			{ $$ = $1; }
+	| LBRACE scope RBRACE	{ $$ = $2; }
 ;
 
 stm	: SEMICOLON					{ $$ = AST::makeBlocksTerm();		}
-	| expr	SEMICOLON				{ $$ = AST::makeStmExpr($1);		}
-	| func						{ $$ = $1;				}
+	| expr SEMICOLON				{ $$ = AST::makeStmExpr($1);		}
 	| PRINT expr SEMICOLON				{ $$ = AST::makeStmPrint($2);		}
-	| WHILE LPAR expr RPAR func			{ $$ = AST::makeStmWhile($3, $5);	}
-	| IF LPAR expr RPAR func	%prec THEN	{ $$ = AST::makeStmIf($3, $5);		}
-	| IF LPAR expr RPAR func ELSE func		{ $$ = AST::makeStmIf($3, $5, $7);	}
+	| WHILE LPAR expr RPAR block			{ $$ = AST::makeStmWhile($3, $5);	}
+	| IF LPAR expr RPAR block 	%prec THEN	{ $$ = AST::makeStmIf($3, $5);		}
+	| IF LPAR expr RPAR block ELSE block		{ $$ = AST::makeStmIf($3, $5, $7);	}
 ;
 
 expr	: LPAR expr RPAR	{ $$ = $2; 				}
@@ -96,6 +96,7 @@ expr	: LPAR expr RPAR	{ $$ = $2; 				}
 	| unop expr %prec UNOP	{ $$ = AST::makeExprUnop($1, $2);	}
 	| NUM			{ $$ = $1;				}
 	| ID			{ $$ = $1;				}
+	| func			{ $$ = $1;				}
 	| QMARK			{ $$ = AST::makeExprQmark();		}
 	| expr STAR	{ $$ = AST::makeBinOpMul();	} expr { $$ = AST::makeExprBinop($3, $1, $4); }
 	| expr SLASH	{ $$ = AST::makeBinOpDiv();	} expr { $$ = AST::makeExprBinop($3, $1, $4); }
@@ -114,8 +115,7 @@ unop	: PLUS		{ $$ = AST::makeUnOpPlus();	}
 	| EXCL		{ $$ = AST::makeUnOpNot();	}
 ;
 
-func	: LBRACE scope RBRACE				{ $$ = AST::makeFunc($2);		}
-	| FUNC declist LBRACE scope RBRACE		{ $$ = AST::makeFunc($4, $2);		}
+func	: FUNC declist LBRACE scope RBRACE		{ $$ = AST::makeFunc($4, $2);		}
 	| FUNC declist COLON ID LBRACE scope RBRACE	{ $$ = AST::makeFunc($6, $2, $4);	}
 ;
 

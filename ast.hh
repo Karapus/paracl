@@ -1,5 +1,6 @@
 #pragma once
 #include "inode.hh"
+#include "exec.h"
 #include <cstdlib>
 #include <iostream>
 #include <map>
@@ -51,12 +52,15 @@ struct FuncValue : public IValue {
 	FuncValue(Func *f) : func(f)
 	{}
 };
-IValue *IValue::defaultValue() {
+inline IValue *IValue::defaultValue() {
 	return new IntValue{0};
 }
 
-struct Expr : public Node, public INode {
+struct Expr : public Node, public IExecable{
 	virtual IValue *eval() = 0;
+	void exec() {
+		eval();
+	}
 };
 
 struct Block : public Expr {
@@ -150,7 +154,7 @@ struct StmPrint : public Stm {
 		delete expr;
 	}
 	IValue *eval() override {
-		std::cout << expr->eval() << std::endl;
+		std::cout << *expr->eval()->get_int() << std::endl;
 		return IValue::defaultValue();
 	}
 };
@@ -168,7 +172,7 @@ struct StmWhile : public Stm {
 	}
 	IValue *eval() override {
 		IValue *res;
-		while (expr->eval()->get_int())
+		while (*(expr->eval()->get_int()))
 			res = block->eval();
 		return res;
 	}
@@ -190,7 +194,7 @@ struct StmIf : public Stm {
 		delete false_block;
 	}
 	IValue *eval() override {
-		if (expr->eval())
+		if (*(expr->eval()->get_int()))
 			return true_block->eval();
 		else if (false_block)
 			return false_block->eval();
@@ -223,7 +227,7 @@ struct ExprId : public Expr {
 	}
 };
 
-struct Func : public Node, public INode {
+struct Func : public Expr {
 	Scope *body;
 	Declist *decls;
 	Func(Scope *b) : Func(b, nullptr)
@@ -242,11 +246,16 @@ struct Func : public Node, public INode {
 		delete body;
 		delete decls;
 	}
-	IValue *apply(ExprList *ops) {
-		if (ops->size() != decls->size())
-			throw std::logic_error("incorrect number of arguments in application");
-		std::for_each(ops->begin(), ops->end(), [=, it = decls->begin()](Expr *expr){ return body->vars[*it] = expr->eval(); });
+	IValue *apply(ExprList *ops = nullptr) {
+		if (ops) {
+			if (ops->size() != decls->size())
+				throw std::logic_error("incorrect number of arguments in application");
+			std::for_each(ops->begin(), ops->end(), [=, it = decls->begin()](Expr *expr){ return body->vars[*it] = expr->eval(); });
+		}
 		return body->eval();
+	}
+	IValue *eval() override {
+		return apply();
 	}
 };
 
