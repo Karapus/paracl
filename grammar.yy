@@ -74,11 +74,11 @@ scope   : LBRACE blocks RBRACE	{ $$ = AST::makeScope($2);	}
 
 blocks	: blocks block 	{ $$ = AST::makeBlocks($1, $2); }
         | %empty	{ $$ = AST::makeBlocksTerm();   }
-        | error		{ $$ = AST::makeBlocksTerm();   }
 ;
 
 block	: stm			{ $$ = $1; }
 	| scope			{ $$ = $1; }
+        | error			{ $$ = AST::makeBlocksTerm();   }
 ;
 
 stm	: SEMICOLON					{ $$ = AST::makeBlocksTerm();		}

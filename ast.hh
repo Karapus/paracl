@@ -48,7 +48,12 @@ inline IValue *IValue::defaultValue() {
 struct Expr : public Node, public IExecable{
 	virtual IValue *eval() = 0;
 	void exec() {
-		eval();
+		try {
+			eval();
+		} catch (std::logic_error& err)
+		{
+			std::cout << "Semantic error: " << err.what() << std::endl;
+		}
 	}
 };
 
