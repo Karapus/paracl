@@ -43,7 +43,6 @@
 	WHILE
 	IF
 	ELSE
-	FUNC
 	LBRACE
 	RBRACE
 	LPAR
@@ -53,7 +52,7 @@
 	COMA
 	NUM
 	ID
-	FUNCTION
+	FUNC
 	RETURN
 
 %destructor { delete $$; } NUM ID scope stm expr unop
@@ -67,19 +66,19 @@
 
 %start program
 %%
-program : scope	END	{ driver.yylval = $1; }
+program : blocks END	{ driver.yylval = AST::makeScope($1);	}
 ;
 
-scope   : blocks        { $$ = AST::makeScope($1);      }
+scope   : LBRACE blocks RBRACE	{ $$ = AST::makeScope($2);	}
 ;
 
-blocks	: blocks block	{ $$ = AST::makeBlocks($1, $2); }
+blocks	: blocks block 	{ $$ = AST::makeBlocks($1, $2); }
         | %empty	{ $$ = AST::makeBlocksTerm();   }
         | error		{ $$ = AST::makeBlocksTerm();   }
 ;
 
 block	: stm			{ $$ = $1; }
-	| LBRACE scope RBRACE	{ $$ = $2; }
+	| scope			{ $$ = $1; }
 ;
 
 stm	: SEMICOLON					{ $$ = AST::makeBlocksTerm();		}
@@ -88,6 +87,7 @@ stm	: SEMICOLON					{ $$ = AST::makeBlocksTerm();		}
 	| WHILE LPAR expr RPAR block			{ $$ = AST::makeStmWhile($3, $5);	}
 	| IF LPAR expr RPAR block 	%prec THEN	{ $$ = AST::makeStmIf($3, $5);		}
 	| IF LPAR expr RPAR block ELSE block		{ $$ = AST::makeStmIf($3, $5, $7);	}
+	| ID ASSIGN func				{ $$ = AST::makeStmExpr(AST::makeExprAssign($1, $3));	}
 ;
 
 expr	: LPAR expr RPAR	{ $$ = $2; 				}
@@ -96,7 +96,6 @@ expr	: LPAR expr RPAR	{ $$ = $2; 				}
 	| unop expr %prec UNOP	{ $$ = AST::makeExprUnop($1, $2);	}
 	| NUM			{ $$ = $1;				}
 	| ID			{ $$ = $1;				}
-	| func			{ $$ = $1;				}
 	| QMARK			{ $$ = AST::makeExprQmark();		}
 	| expr STAR	{ $$ = AST::makeBinOpMul();	} expr { $$ = AST::makeExprBinop($3, $1, $4); }
 	| expr SLASH	{ $$ = AST::makeBinOpDiv();	} expr { $$ = AST::makeExprBinop($3, $1, $4); }
@@ -115,8 +114,9 @@ unop	: PLUS		{ $$ = AST::makeUnOpPlus();	}
 	| EXCL		{ $$ = AST::makeUnOpNot();	}
 ;
 
-func	: FUNC declist LBRACE scope RBRACE		{ $$ = AST::makeFunc($4, $2);		}
-	| FUNC declist COLON ID LBRACE scope RBRACE	{ $$ = AST::makeFunc($6, $2, $4);	}
+func	: scope				{ $$ = $1;				}
+	| FUNC declist scope		{ $$ = AST::makeExprFunc($3, $2);		}
+	| FUNC declist COLON ID scope	{ $$ = AST::makeExprFunc($5, $2, $4);	}
 ;
 
 declist	: LPAR decls RPAR	{ $$ = $2;			}

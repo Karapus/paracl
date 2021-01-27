@@ -44,6 +44,8 @@ id	[a-zA-Z_][a-zA-Z_0-9]*
 "("	return yy::parser::token::TOK_LPAR;
 ")"	return yy::parser::token::TOK_RPAR;
 ";"	return yy::parser::token::TOK_SEMICOLON;
+":"	return yy::parser::token::TOK_COLON;
+","	return yy::parser::token::TOK_COMA;
 {num} {
 		*yylval = AST::makeExprInt(std::stoi(YYText()));
 		return yy::parser::token::TOK_NUM;

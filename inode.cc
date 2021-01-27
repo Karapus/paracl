@@ -88,11 +88,11 @@ INode *AST::makeUnOpNot() {
 INode *AST::makeExprApply(INode *id, INode *ops) {
 	return new ExprApply{static_cast<ExprId *>(id), static_cast<ExprList *>(ops)};
 }
-INode *AST::makeFunc(INode *scope, INode *declist) {
-	return new Func{static_cast<Scope *>(scope), static_cast<Declist *>(declist)};
+INode *AST::makeExprFunc(INode *scope, INode *declist) {
+	return new ExprFunc{static_cast<Scope *>(scope), static_cast<Declist *>(declist)};
 }
-INode *AST::makeFunc(INode *scope, INode *declist, INode *id) {
-	return new Func{static_cast<Scope *>(scope), static_cast<Declist *>(declist), static_cast<ExprId *>(id)};
+INode *AST::makeExprFunc(INode *scope, INode *declist, INode *id) {
+	return new ExprFunc{static_cast<Scope *>(scope), static_cast<Declist *>(declist), static_cast<ExprId *>(id)};
 }
 
 INode *AST::makeDeclist(INode *declist, INode *id) {

@@ -41,17 +41,6 @@ struct IntValue : public IValue {
 {}
 };
 
-struct FuncValue : public IValue {
-	Func *func;
-	int *get_int() override {
-		throw std::logic_error("Func as Int");
-	}
-	Func *get_Func() override {
-		return func;
-	}
-	FuncValue(Func *f) : func(f)
-	{}
-};
 inline IValue *IValue::defaultValue() {
 	return new IntValue{0};
 }
@@ -223,41 +212,64 @@ struct ExprId : public Expr {
 				} catch (std::out_of_range) {
 				}
 			}
-		return 0;
+		return IValue::defaultValue();
 	}
 };
 
-struct Func : public Expr {
+struct ExprFunc : public Expr {
 	Scope *body;
 	Declist *decls;
-	Func(Scope *b) : Func(b, nullptr)
-	{}
-	Func(Scope *b, Declist *d) : body(b), decls(d) {
+	ExprId *id;
+	ExprFunc(Scope *b, Declist *d, ExprId *i = nullptr) : body(b), decls(d), id(i) {
 		body->parent = this;
+			}
+	~ExprFunc() {
+		delete body;
+		delete decls;
 	}
-	Func(Scope *b, Declist *d, ExprId *id) : Func(b, d) {
+	IValue *eval() override;
+};
+
+struct Func {
+	Scope *body_;
+	Declist *decls_;
+	Func(ExprFunc *func) : body_(func->body), decls_(func->decls) 
+	{}
+	IValue *operator () (ExprList *ops) {
+		auto prev_vars = body_->vars;
+		if (ops->size() != decls_->size())
+			throw std::logic_error("incorrect number of arguments in application");
+		std::for_each(ops->begin(), ops->end(), [=, it = decls_->begin() ](Expr *expr) mutable { body_->vars[*it++] = expr->eval();});
+		auto res = body_->eval();
+		body_->vars = prev_vars;
+		return res;
+	}
+};
+
+
+struct FuncValue : public IValue {
+	Func func;
+	int *get_int() override {
+		throw std::logic_error("Func as Int");
+	}
+	Func *get_Func() override {
+		return &func;
+	}
+	FuncValue(Func f) : func(f)
+	{}
+};
+
+inline IValue *ExprFunc::eval() {
+	if (id) {
 		auto node = parent;
 		while (node->parent)
 			node = node->parent;
 		static_cast<Scope *>(node)->vars[id->name] = new FuncValue(this);
 		delete id;
+		id = nullptr;
 	}
-	~Func() {
-		delete body;
-		delete decls;
-	}
-	IValue *apply(ExprList *ops = nullptr) {
-		if (ops) {
-			if (ops->size() != decls->size())
-				throw std::logic_error("incorrect number of arguments in application");
-			std::for_each(ops->begin(), ops->end(), [=, it = decls->begin()](Expr *expr){ return body->vars[*it] = expr->eval(); });
-		}
-		return body->eval();
-	}
-	IValue *eval() override {
-		return apply();
-	}
-};
+	return new FuncValue(this);
+}
 
 struct ExprQmark : public Expr {
 	IValue *eval() override {
@@ -303,13 +315,14 @@ struct ExprApply : public Expr {
 	ExprList *ops;
 	ExprApply(ExprId *i, ExprList *o) : id(i), ops(o) {
 		id->parent = this;
+		std::for_each(ops->begin(), ops->end(), [this] (auto &op) { op->parent = this; });
 	}
 	~ExprApply() {
 		delete id;
 		delete ops;
 	}
 	IValue *eval() override {
-		return id->eval()->get_Func()->apply(ops);
+		return (*id->eval()->get_Func())(ops);
 	}
 };
 

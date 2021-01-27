@@ -40,8 +40,8 @@ INode *makeUnOpMinus();
 INode *makeUnOpNot();
 
 INode *makeExprApply(INode *id, INode *ops);
-INode *makeFunc(INode *scope, INode *declist = nullptr);
-INode *makeFunc(INode *scope, INode *declist, INode *id);
+INode *makeExprFunc(INode *scope, INode *declist = nullptr);
+INode *makeExprFunc(INode *scope, INode *declist, INode *id);
 INode *makeDeclist(INode *declist, INode *id);
 INode *makeDeclistTerm();
 INode *makeExprlist(INode *exprlist, INode *expr);
