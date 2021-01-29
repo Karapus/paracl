@@ -1,13 +1,10 @@
 #pragma once
 #include "inode.hh"
 #include "exec.h"
-#include <cstdlib>
 #include <iostream>
 #include <map>
 #include <stdexcept>
-#include <variant>
 #include <list>
-#include <algorithm>
 #include <typeinfo>
 
 namespace AST {
@@ -15,8 +12,10 @@ namespace AST {
 struct Func;
 
 struct IValue {
-	virtual int *get_int() = 0;
-	virtual Func *get_Func() = 0;
+	virtual int &get_int() = 0;
+	virtual Func &get_Func() = 0;
+	virtual IValue &operator = (const IValue &rhs) = 0;
+	virtual IValue *clone() = 0;
 	virtual ~IValue() {};
 	static IValue *defaultValue();
 };
@@ -29,16 +28,24 @@ struct Node {
 };
 
 struct IntValue : public IValue {
-	int val;
-	int *get_int() override {
-		return &val;
+	private:
+	int val_;
+	public:
+	int &get_int() override {
+		return val_;
 	}
-	Func *get_Func() override {
+	Func &get_Func() override {
 		throw std::logic_error("Int as Func");
 	}
-	IntValue(int v) : val(v)
-	
-{}
+	IntValue &operator = (const IValue &rhs) override {
+		val_ = static_cast<const IntValue &>(rhs).val_;
+		return *this;
+	}
+	IntValue *clone() override {
+		return new IntValue(val_);
+	}
+	IntValue(int v) : val_(v)
+	{}
 };
 
 inline IValue *IValue::defaultValue() {
@@ -48,12 +55,14 @@ inline IValue *IValue::defaultValue() {
 struct Expr : public Node, public IExecable{
 	virtual IValue *eval() = 0;
 	void exec() {
+		IValue *res = nullptr;
 		try {
-			eval();
+			res = eval();
 		} catch (std::logic_error& err)
 		{
 			std::cout << "Semantic error: " << err.what() << std::endl;
 		}
+		delete res;
 	}
 };
 
@@ -63,7 +72,12 @@ struct Block : public Expr {
 struct BinOp : public Node, public INode {
 	template <typename F>
 	IntValue *as_int(F functor, Expr *lhs, Expr *rhs) {
-		return new IntValue{functor(*(lhs->eval()->get_int()), *(rhs->eval()->get_int()))};
+		auto val_l = lhs->eval();
+		auto val_r = rhs->eval();
+		int res = functor(val_l->get_int(), val_r->get_int());
+		delete val_l;
+		delete val_r;
+		return new IntValue{res};
 	}
 	virtual IValue *operator() (Expr *lhs, Expr *rhs) = 0;
 };
@@ -71,7 +85,10 @@ struct BinOp : public Node, public INode {
 struct UnOp : public Node, public INode {
 	template <typename F>
 	IntValue *as_int(F functor, Expr *rhs) {
-		return new IntValue{functor(*(rhs->eval()->get_int()))};
+		auto val = rhs->eval();
+		int res = functor(val->get_int());
+		delete val;
+		return new IntValue{res};
 	}
 	virtual IValue *operator() (Expr *rhs) = 0;
 };
@@ -94,17 +111,19 @@ struct Blocks : public Block {
 		delete tail;
 	}
 	IValue *eval() override {
-		IValue *res;
+		IValue *res = nullptr;
 		if (head)
 			res = head->eval();
-		if (tail)
+		if (tail) {
+			delete res;
 			res = tail->eval();
+		}
 		return res;
 	}
 };
 
 struct Scope : public Block {
-	VarsT vars;
+	VarsT vars_;
 	Blocks *blocks;
 	Scope(Blocks *b) : blocks(b) {
 		if (blocks)
@@ -112,11 +131,25 @@ struct Scope : public Block {
 	}
 	~Scope() {
 		delete blocks;
+		for (auto elem : vars_)
+			delete elem.second;
 	}
 	IValue *eval() override {
 		if (blocks)
 			return blocks->eval();
 		return IValue::defaultValue();
+	}
+	void assign(const std::string &name, IValue *new_val) {
+		try {
+			auto &dest = vars_.at(name);
+			if (dest != new_val) {
+				delete dest;
+				dest = new_val;
+			}
+		}
+		catch (std::out_of_range) {
+			vars_[name] = new_val;
+		}
 	}
 };
 
@@ -124,6 +157,10 @@ struct Declist : public INode, public std::list<std::string> {
 };
 
 struct ExprList : public INode, public std::list<Expr *> {
+	~ExprList() {
+		for (auto expr : *this)
+			delete expr;
+	}
 };
 
 struct StmExpr : public Stm {
@@ -148,8 +185,9 @@ struct StmPrint : public Stm {
 		delete expr;
 	}
 	IValue *eval() override {
-		std::cout << *expr->eval()->get_int() << std::endl;
-		return IValue::defaultValue();
+		auto val = expr->eval();
+		std::cout << val->get_int() << std::endl;
+		return val;
 	}
 };
 
@@ -165,9 +203,14 @@ struct StmWhile : public Stm {
 		delete block;
 	}
 	IValue *eval() override {
-		IValue *res;
-		while (*(expr->eval()->get_int()))
+		IValue *res = IValue::defaultValue();
+		IValue *cond;
+		while ((cond = expr->eval())->get_int()) {
+			delete cond;
+			delete res;
 			res = block->eval();
+		}
+		delete cond;
 		return res;
 	}
 };
@@ -188,11 +231,16 @@ struct StmIf : public Stm {
 		delete false_block;
 	}
 	IValue *eval() override {
-		if (*(expr->eval()->get_int()))
-			return true_block->eval();
+		auto cond = expr->eval();
+		IValue *res;
+		if (cond->get_int())
+			res = true_block->eval();
 		else if (false_block)
-			return false_block->eval();
-		return IValue::defaultValue();
+			res = false_block->eval();
+		else
+			res = IValue::defaultValue();
+		delete cond;
+		return res;
 	}
 };
 
@@ -213,7 +261,7 @@ struct ExprId : public Expr {
 		for (Node *node = parent; node; node = node->parent)
 			if (typeid(*node) == typeid(Scope)) {
 				try {
-					return static_cast<Scope *>(node)->vars.at(name);
+					return static_cast<Scope *>(node)->vars_.at(name)->clone();
 				} catch (std::out_of_range) {
 				}
 			}
@@ -241,26 +289,39 @@ struct Func {
 	Func(ExprFunc *func) : body_(func->body), decls_(func->decls) 
 	{}
 	IValue *operator () (ExprList *ops) {
-		auto prev_vars = body_->vars;
+		auto prev_vars = body_->vars_;
 		if (ops->size() != decls_->size())
 			throw std::logic_error("incorrect number of arguments in application");
-		std::for_each(ops->begin(), ops->end(), [=, it = decls_->begin() ](Expr *expr) mutable { body_->vars[*it++] = expr->eval();});
+		auto it = decls_->begin();
+		for (auto expr : *ops)
+			body_->vars_[*it++] = expr->eval();
 		auto res = body_->eval();
-		body_->vars = prev_vars;
+		for (auto name : *decls_)
+			delete body_->vars_.at(name);
+		body_->vars_ = prev_vars;
 		return res;
 	}
 };
 
 
 struct FuncValue : public IValue {
-	Func func;
-	int *get_int() override {
+	private:
+	Func func_;
+	public:
+	int &get_int() override {
 		throw std::logic_error("Func as Int");
 	}
-	Func *get_Func() override {
-		return &func;
+	Func &get_Func() override {
+		return func_;
 	}
-	FuncValue(Func f) : func(f)
+	FuncValue &operator = (const IValue &rhs) override {
+		func_ = static_cast<const FuncValue &>(rhs).func_;
+		return *this;
+	}
+	FuncValue *clone() override {
+		return new FuncValue(func_);
+	}
+	FuncValue(Func f) : func_(f)
 	{}
 };
 
@@ -269,7 +330,7 @@ inline IValue *ExprFunc::eval() {
 		auto node = parent;
 		while (node->parent)
 			node = node->parent;
-		static_cast<Scope *>(node)->vars[id->name] = new FuncValue(this);
+		static_cast<Scope *>(node)->assign(id->name, new FuncValue(this));
 		delete id;
 		id = nullptr;
 	}
@@ -299,13 +360,15 @@ struct ExprAssign : public Expr {
 		for (Node *node = parent; node; node = node->parent)
 			if (typeid(*node) == typeid(Scope))
 				try {
-					static_cast<Scope *>(node)->vars.at(id->name) = val;
+					auto &dest = static_cast<Scope *>(node)->vars_.at(id->name);
+					delete dest;
+					dest = val;
 				} catch (std::out_of_range) {
 					if (!node->parent) {
-						getScope()->vars[id->name] = val;
+						getScope()->vars_[id->name] = val;
 					}
 				}
-		return val;
+		return  val->clone();
 	}
 	Scope *getScope() {
 		auto scope = parent;
@@ -320,14 +383,18 @@ struct ExprApply : public Expr {
 	ExprList *ops;
 	ExprApply(ExprId *i, ExprList *o) : id(i), ops(o) {
 		id->parent = this;
-		std::for_each(ops->begin(), ops->end(), [this] (auto &op) { op->parent = this; });
+		for (auto expr : *ops)
+			expr->parent = this;
 	}
 	~ExprApply() {
 		delete id;
 		delete ops;
 	}
 	IValue *eval() override {
-		return (*id->eval()->get_Func())(ops);
+		auto val = id->eval();
+		auto res = val->get_Func()(ops);
+		delete val;
+		return res;
 	}
 };
 
