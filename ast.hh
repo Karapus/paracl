@@ -4,7 +4,8 @@
 #include <iostream>
 #include <map>
 #include <stdexcept>
-#include <list>
+#include <string>
+#include <vector>
 #include <typeinfo>
 
 namespace AST {
@@ -15,15 +16,16 @@ struct IValue {
 	virtual int &get_int() = 0;
 	virtual Func &get_Func() = 0;
 	virtual IValue &operator = (const IValue &rhs) = 0;
-	virtual IValue *clone() = 0;
+	virtual IValue *clone() const = 0;
 	virtual ~IValue() {};
 	static IValue *defaultValue();
 };
 
 using VarsT = std::map<std::string, IValue *>;
 
+struct Scope;
 struct Node {
-	Node *parent = nullptr;
+	Node *parent_ = nullptr;
 	virtual ~Node() {};
 };
 
@@ -41,7 +43,7 @@ struct IntValue : public IValue {
 		val_ = static_cast<const IntValue &>(rhs).val_;
 		return *this;
 	}
-	IntValue *clone() override {
+	IntValue *clone() const override {
 		return new IntValue(val_);
 	}
 	IntValue(int v) : val_(v)
@@ -64,70 +66,99 @@ struct Expr : public Node, public IExecable{
 		}
 		delete res;
 	}
-};
-
-struct Block : public Expr {
+	Scope *getScope();
 };
 
 struct BinOp : public Node, public INode {
 	template <typename F>
-	IntValue *as_int(F functor, Expr *lhs, Expr *rhs) {
+	IValue *as_int(F functor, Expr *lhs, Expr *rhs) {
 		auto val_l = lhs->eval();
 		auto val_r = rhs->eval();
-		int res = functor(val_l->get_int(), val_r->get_int());
-		delete val_l;
+		val_l->get_int() = functor(val_l->get_int(), val_r->get_int());
 		delete val_r;
-		return new IntValue{res};
+		return val_l;
 	}
 	virtual IValue *operator() (Expr *lhs, Expr *rhs) = 0;
 };
 
 struct UnOp : public Node, public INode {
 	template <typename F>
-	IntValue *as_int(F functor, Expr *rhs) {
+	IValue *as_int(F functor, Expr *rhs) {
 		auto val = rhs->eval();
-		int res = functor(val->get_int());
-		delete val;
-		return new IntValue{res};
+		val->get_int() = functor(val->get_int());
+		return val;
 	}
 	virtual IValue *operator() (Expr *rhs) = 0;
 };
 
-struct Stm : public Block {
-};
-
-struct Blocks : public Block {
-	Block *head;
-	Blocks *tail;
-	Blocks(Block *h, Blocks *t) : head(h), tail(t)
-	{
-		if (head) 
-			head->parent = this;
-		if (tail)
-			tail->parent = this;
+struct BlockList : public Expr {
+	private:
+	std::vector<Expr *> cner_;
+	public:
+	~BlockList() {
+		for (auto expr : cner_)
+			delete expr;
 	}
-	~Blocks() {
-		delete head;
-		delete tail;
+	void push_back(Expr *expr) {
+		cner_.push_back(expr);
+		expr->parent_ = this;
 	}
 	IValue *eval() override {
-		IValue *res = nullptr;
-		if (head)
-			res = head->eval();
-		if (tail) {
+		IValue *res = IValue::defaultValue();
+		for (auto expr : cner_) {
 			delete res;
-			res = tail->eval();
+			res = expr->eval();
 		}
 		return res;
 	}
 };
 
-struct Scope : public Block {
+struct DeclList : public INode {
+	private:
+	std::vector<std::string> cner_;
+	public:
+	auto begin() {
+		return cner_.begin();
+	}
+	auto end() {
+		return cner_.end();
+	}
+	auto size() const {
+		return cner_.size();
+	}
+	auto push_back(const std::string &x) {
+		return cner_.push_back(x);
+	}
+};
+
+struct ExprList : public INode {
+	private:
+	std::vector<Expr *> cner_;
+	public:
+	~ExprList() {
+		for (auto expr : cner_)
+			delete expr;
+	}
+	auto begin() {
+		return cner_.begin();
+	}
+	auto end() {
+		return cner_.end();
+	}
+	auto size() const {
+		return cner_.size();
+	}
+	auto push_back(Expr *expr) {
+		return cner_.push_back(expr);
+	}
+};
+
+struct Scope : public Expr {
 	VarsT vars_;
-	Blocks *blocks;
-	Scope(Blocks *b) : blocks(b) {
+	BlockList *blocks;
+	Scope(BlockList *b) : blocks(b) {
 		if (blocks)
-			blocks->parent = this;
+			blocks->parent_ = this;
 	}
 	~Scope() {
 		delete blocks;
@@ -139,34 +170,38 @@ struct Scope : public Block {
 			return blocks->eval();
 		return IValue::defaultValue();
 	}
-	void assign(const std::string &name, IValue *new_val) {
-		try {
-			auto &dest = vars_.at(name);
+	bool assign(const std::string &name, IValue *new_val, bool forse_flag = true) {
+		auto dest_it = vars_.find(name);
+		if (dest_it != vars_.end()) {
+			auto &dest = dest_it->second;
 			if (dest != new_val) {
 				delete dest;
 				dest = new_val;
 			}
+			return true;
 		}
-		catch (std::out_of_range) {
+		else if (forse_flag) {
 			vars_[name] = new_val;
 		}
+		return forse_flag;
+	}
+	IValue *resolve(const std::string &name) const {
+		auto it = vars_.find(name);
+		return it != vars_.cend() ? it->second->clone() : nullptr; 
 	}
 };
 
-struct Declist : public INode, public std::list<std::string> {
-};
+inline Scope *Expr::getScope() {
+	auto node = parent_;
+	while (node && (typeid(*node) != typeid(Scope)))
+		node = node->parent_;
+	return static_cast<Scope *>(node);
+}
 
-struct ExprList : public INode, public std::list<Expr *> {
-	~ExprList() {
-		for (auto expr : *this)
-			delete expr;
-	}
-};
-
-struct StmExpr : public Stm {
+struct StmExpr : public Expr {
 	Expr *expr;
 	StmExpr(Expr *e) : expr(e) {
-		expr->parent = this;
+		expr->parent_ = this;
 	}
 	~StmExpr() {
 		delete expr;
@@ -176,10 +211,10 @@ struct StmExpr : public Stm {
 	}
 };
 
-struct StmPrint : public Stm {
+struct StmPrint : public Expr {
 	Expr *expr;
 	StmPrint(Expr *e) : expr(e) {
-		expr->parent = this;
+		expr->parent_ = this;
 	}
 	~StmPrint() {
 		delete expr;
@@ -191,12 +226,12 @@ struct StmPrint : public Stm {
 	}
 };
 
-struct StmWhile : public Stm {
+struct StmWhile : public Expr {
 	Expr *expr;
-	Block *block;
-	StmWhile(Expr *e, Block *b) : expr(e), block(b) {
-		expr->parent = this;
-		block->parent = this;
+	Expr *block;
+	StmWhile(Expr *e, Expr *b) : expr(e), block(b) {
+		expr->parent_ = this;
+		block->parent_ = this;
 	}
 	~StmWhile() {
 		delete expr;
@@ -215,15 +250,15 @@ struct StmWhile : public Stm {
 	}
 };
 
-struct StmIf : public Stm {
+struct StmIf : public Expr {
 	Expr *expr;
-	Block *true_block;
-	Block *false_block;
-	StmIf(Expr *e, Block *tb, Block *fb) : expr(e), true_block(tb), false_block(fb) {
-		expr->parent = this;
-		true_block->parent = this;
+	Expr *true_block;
+	Expr *false_block;
+	StmIf(Expr *e, Expr *tb, Expr *fb) : expr(e), true_block(tb), false_block(fb) {
+		expr->parent_ = this;
+		true_block->parent_ = this;
 		if (false_block)
-			false_block->parent = this;
+			false_block->parent_ = this;
 	}
 	~StmIf() {
 		delete expr;
@@ -244,6 +279,25 @@ struct StmIf : public Stm {
 	}
 };
 
+struct ReturnExcept {
+	IValue *val_;
+	ReturnExcept(IValue *val) : val_(val) {
+	}
+};
+
+struct StmReturn : public Expr {
+	Expr *expr_;
+	StmReturn(Expr *expr) : expr_(expr) {
+		expr_->parent_ = this;
+	}
+	~StmReturn() {
+		delete expr_;
+	}
+	IValue *eval() {
+		throw ReturnExcept(expr_->eval());
+	}
+};
+
 struct ExprInt : public Expr {
 	int val;
 	ExprInt(int i) : val(i)
@@ -258,23 +312,21 @@ struct ExprId : public Expr {
 	ExprId(std::string n) : name(n)
 	{}
 	IValue *eval() override {
-		for (Node *node = parent; node; node = node->parent)
-			if (typeid(*node) == typeid(Scope)) {
-				try {
-					return static_cast<Scope *>(node)->vars_.at(name)->clone();
-				} catch (std::out_of_range) {
-				}
-			}
+		for (auto scope = getScope(); scope; scope = scope->getScope()) {
+			auto val = scope->resolve(name);
+			if (val)
+				return val;
+		}
 		return IValue::defaultValue();
 	}
 };
 
 struct ExprFunc : public Expr {
 	Scope *body;
-	Declist *decls;
+	DeclList *decls;
 	ExprId *id;
-	ExprFunc(Scope *b, Declist *d, ExprId *i = nullptr) : body(b), decls(d), id(i) {
-		body->parent = this;
+	ExprFunc(Scope *b, DeclList *d, ExprId *i = nullptr) : body(b), decls(d), id(i) {
+		body->parent_ = this;
 			}
 	~ExprFunc() {
 		delete body;
@@ -283,9 +335,10 @@ struct ExprFunc : public Expr {
 	IValue *eval() override;
 };
 
+
 struct Func {
 	Scope *body_;
-	Declist *decls_;
+	DeclList *decls_;
 	Func(ExprFunc *func) : body_(func->body), decls_(func->decls) 
 	{}
 	IValue *operator () (ExprList *ops) {
@@ -295,7 +348,12 @@ struct Func {
 		auto it = decls_->begin();
 		for (auto expr : *ops)
 			body_->vars_[*it++] = expr->eval();
-		auto res = body_->eval();
+		IValue *res;
+		try {
+			res = body_->eval();
+		} catch (ReturnExcept &ret) {
+			res = ret.val_;
+		}
 		for (auto name : *decls_)
 			delete body_->vars_.at(name);
 		body_->vars_ = prev_vars;
@@ -318,7 +376,7 @@ struct FuncValue : public IValue {
 		func_ = static_cast<const FuncValue &>(rhs).func_;
 		return *this;
 	}
-	FuncValue *clone() override {
+	FuncValue *clone() const override {
 		return new FuncValue(func_);
 	}
 	FuncValue(Func f) : func_(f)
@@ -327,9 +385,9 @@ struct FuncValue : public IValue {
 
 inline IValue *ExprFunc::eval() {
 	if (id) {
-		auto node = parent;
-		while (node->parent)
-			node = node->parent;
+		auto node = parent_;
+		while (node->parent_)
+			node = node->parent_;
 		static_cast<Scope *>(node)->assign(id->name, new FuncValue(this));
 		delete id;
 		id = nullptr;
@@ -348,8 +406,8 @@ struct ExprAssign : public Expr {
 	ExprId *id;
 	Expr *expr;
 	ExprAssign(ExprId *i, Expr *e) : id(i), expr(e) {
-		id->parent = this;
-		expr->parent = this;
+		id->parent_ = this;
+		expr->parent_ = this;
 	}
 	~ExprAssign() {
 		delete id;
@@ -357,24 +415,12 @@ struct ExprAssign : public Expr {
 	}
 	IValue *eval() override {
 		IValue *val = expr->eval();
-		for (Node *node = parent; node; node = node->parent)
-			if (typeid(*node) == typeid(Scope))
-				try {
-					auto &dest = static_cast<Scope *>(node)->vars_.at(id->name);
-					delete dest;
-					dest = val;
-				} catch (std::out_of_range) {
-					if (!node->parent) {
-						getScope()->vars_[id->name] = val;
-					}
-				}
+		const auto &name = id->name;
+		bool flag;
+		for (auto scope = getScope(); scope && (flag = !scope->assign(name, val, false)); scope = scope->getScope())
+			;
+		if (flag) getScope()->assign(name, val);
 		return  val->clone();
-	}
-	Scope *getScope() {
-		auto scope = parent;
-		for (; typeid(*scope) != typeid(Scope); scope = scope->parent)
-			{}
-		return static_cast<Scope *>(scope);
 	}
 };
 
@@ -382,9 +428,9 @@ struct ExprApply : public Expr {
 	ExprId *id;
 	ExprList *ops;
 	ExprApply(ExprId *i, ExprList *o) : id(i), ops(o) {
-		id->parent = this;
+		id->parent_ = this;
 		for (auto expr : *ops)
-			expr->parent = this;
+			expr->parent_ = this;
 	}
 	~ExprApply() {
 		delete id;
@@ -403,9 +449,9 @@ struct ExprBinOp : public Expr {
 	Expr *lhs;
 	Expr *rhs;
 	ExprBinOp(BinOp *o, Expr *l, Expr *r) : op(o), lhs(l), rhs(r) {
-		op->parent = this;
-		lhs->parent = this;
-		rhs->parent = this;
+		op->parent_ = this;
+		lhs->parent_ = this;
+		rhs->parent_ = this;
 	}
 	~ExprBinOp() {
 		delete op;
@@ -421,8 +467,8 @@ struct ExprUnOp : public Expr {
 	UnOp *op;
 	Expr *rhs;
 	ExprUnOp(UnOp *o, Expr *r) : op(o), rhs(r) {
-		op->parent = this;
-		rhs->parent = this;
+		op->parent_ = this;
+		rhs->parent_ = this;
 	}
 	~ExprUnOp() {
 		delete op;

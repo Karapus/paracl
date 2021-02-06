@@ -72,22 +72,23 @@ program : blocks END	{ driver.yylval = AST::makeScope($1);	}
 scope   : LBRACE blocks RBRACE	{ $$ = AST::makeScope($2);	}
 ;
 
-blocks	: blocks block 	{ $$ = AST::makeBlocks($1, $2); }
-        | %empty	{ $$ = AST::makeBlocksTerm();   }
+blocks	: blocks block 	{ $$ = AST::makeBlockList($1, $2); }
+        | %empty	{ $$ = AST::makeBlockListTerm();   }
 ;
 
 block	: stm			{ $$ = $1; }
 	| scope			{ $$ = $1; }
-        | error			{ $$ = AST::makeBlocksTerm();   }
+        | error			{ $$ = AST::makeScope(AST::makeBlockListTerm());   }
 ;
 
-stm	: SEMICOLON					{ $$ = AST::makeBlocksTerm();		}
+stm	: SEMICOLON					{ $$ = AST::makeBlockListTerm();	}
 	| expr SEMICOLON				{ $$ = AST::makeStmExpr($1);		}
 	| PRINT expr SEMICOLON				{ $$ = AST::makeStmPrint($2);		}
 	| WHILE LPAR expr RPAR block			{ $$ = AST::makeStmWhile($3, $5);	}
 	| IF LPAR expr RPAR block 	%prec THEN	{ $$ = AST::makeStmIf($3, $5);		}
 	| IF LPAR expr RPAR block ELSE block		{ $$ = AST::makeStmIf($3, $5, $7);	}
 	| ID ASSIGN func				{ $$ = AST::makeStmExpr(AST::makeExprAssign($1, $3));	}
+	| RETURN expr SEMICOLON				{ $$ = AST::makeStmReturn($2);		}
 ;
 
 expr	: LPAR expr RPAR	{ $$ = $2; 				}
@@ -120,19 +121,19 @@ func	: scope				{ $$ = $1;				}
 ;
 
 declist	: LPAR decls RPAR	{ $$ = $2;			}
-	| LPAR RPAR		{ $$ = AST::makeDeclistTerm();	}
+	| LPAR RPAR		{ $$ = AST::makeDeclListTerm();	}
 ;
 
-decls	: decls COMA ID	{ $$ = AST::makeDeclist($1, $3);		}
-	| ID		{ $$ = AST::makeDeclist(AST::makeDeclistTerm(), $1);	}
+decls	: decls COMA ID	{ $$ = AST::makeDeclList($1, $3);		}
+	| ID		{ $$ = AST::makeDeclList(AST::makeDeclListTerm(), $1);	}
 ;
 
 applist	: LPAR exprs RPAR	{ $$ = $2;			}
-	| LPAR RPAR		{ $$ = AST::makeExprlistTerm();	}
+	| LPAR RPAR		{ $$ = AST::makeExprListTerm();	}
 ;
 
-exprs	: exprs COMA expr	{ $$ = AST::makeExprlist($1, $3);			}
-	| expr			{ $$ = AST::makeExprlist(AST::makeExprlistTerm(), $1);	}
+exprs	: exprs COMA expr	{ $$ = AST::makeExprList($1, $3);			}
+	| expr			{ $$ = AST::makeExprList(AST::makeExprListTerm(), $1);	}
 ;
 
 %%

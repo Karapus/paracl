@@ -11,8 +11,8 @@ INode *makeExprId(std::string name);
 
 INode *makeScope(INode *blocks);
 
-INode *makeBlocks(INode *head, INode *tail);
-INode *makeBlocksTerm();
+INode *makeBlockList(INode *blocks, INode *block);
+INode *makeBlockListTerm();
 
 INode *makeStmExpr(INode *expr);
 INode *makeStmPrint(INode *expr);
@@ -42,8 +42,10 @@ INode *makeUnOpNot();
 INode *makeExprApply(INode *id, INode *ops);
 INode *makeExprFunc(INode *scope, INode *declist = nullptr);
 INode *makeExprFunc(INode *scope, INode *declist, INode *id);
-INode *makeDeclist(INode *declist, INode *id);
-INode *makeDeclistTerm();
-INode *makeExprlist(INode *exprlist, INode *expr);
-INode *makeExprlistTerm();
+INode *makeDeclList(INode *declist, INode *id);
+INode *makeDeclListTerm();
+INode *makeExprList(INode *exprlist, INode *expr);
+INode *makeExprListTerm();
+
+INode *makeStmReturn(INode *expr);
 }
