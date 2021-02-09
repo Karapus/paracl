@@ -1,6 +1,6 @@
-$CFLAGS=-O0 -Wall -Wextra -g
+CFLAGS= -O0 -Wall -Wextra -g -std=c++20
 all: driver.out
-driver.out: driver.o lex.o grammar.o inode.o
+driver.out: driver.o lex.o grammar.o inode.o ast.o
 	g++ $(CFLAGS) $? -o $@
 driver.o: driver.cc driver.h grammar.tab.hh inode.hh location.hh lexer.h exec.h
 	g++ $(CFLAGS) -c $< -o $@
@@ -13,6 +13,8 @@ grammar.tab.hh: grammar.yy
 grammar.o: grammar.tab.cc grammar.tab.hh inode.hh location.hh driver.h lexer.h exec.h
 	g++ $(CFLAGS) -c $< -o $@
 inode.o: inode.cc ast.hh inode.hh exec.h
+	g++ $(CFLAGS) -c $< -o $@
+ast.o: ast.cc ast.hh
 	g++ $(CFLAGS) -c $< -o $@
 clean:
 	rm -f *.o *.out

@@ -1,27 +1,28 @@
 #pragma once
 #include "inode.hh"
 #include "exec.h"
+#include <algorithm>
 #include <iostream>
 #include <map>
 #include <stdexcept>
 #include <string>
 #include <vector>
 #include <typeinfo>
+#include <optional>
+#include <functional>
 
 namespace AST {
 
 struct Func;
 
 struct IValue {
-	virtual int &get_int() = 0;
-	virtual Func &get_Func() = 0;
-	virtual IValue &operator = (const IValue &rhs) = 0;
+	virtual operator int&() = 0;
+	virtual operator Func&() = 0;
 	virtual IValue *clone() const = 0;
 	virtual ~IValue() {};
 	static IValue *defaultValue();
 };
 
-using VarsT = std::map<std::string, IValue *>;
 
 struct Scope;
 struct Node {
@@ -30,65 +31,112 @@ struct Node {
 };
 
 struct IntValue : public IValue {
-	private:
+private:
 	int val_;
-	public:
-	int &get_int() override {
+public:
+	operator int&() override {
 		return val_;
 	}
-	Func &get_Func() override {
+	operator Func&() override {
 		throw std::logic_error("Int as Func");
-	}
-	IntValue &operator = (const IValue &rhs) override {
-		val_ = static_cast<const IntValue &>(rhs).val_;
-		return *this;
 	}
 	IntValue *clone() const override {
 		return new IntValue(val_);
 	}
-	IntValue(int v) : val_(v)
+	IntValue(int val) : val_(val)
 	{}
 };
 
-inline IValue *IValue::defaultValue() {
-	return new IntValue{0};
-}
+struct ExprFunc;
+struct DeclList;
+struct ExprList;
+struct Value;
+
+struct Func {
+	Scope *body_;
+	DeclList *decls_;
+	Func(ExprFunc *func);
+	Value operator () (ExprList *ops);
+};
+
+struct FuncValue : public IValue {
+	private:
+	Func func_;
+	public:
+	operator int&() override {
+		throw std::logic_error("Func as Int");
+	}
+	operator Func&() override {
+		return func_;
+	}
+	FuncValue *clone() const override {
+		return new FuncValue(func_);
+	}
+	FuncValue(Func f) : func_(f)
+	{}
+};
+
+struct Value {
+	private:
+	IValue *ptr_;
+	public:
+	Value() : ptr_(IValue::defaultValue()) {
+	}
+	Value(const Value &rhs) {
+		ptr_ = rhs.ptr_->clone();
+	}
+	Value &operator = (const Value &rhs) {
+		if (this != &rhs) {
+			delete ptr_;
+			ptr_ = rhs.ptr_->clone();
+		}
+		return *this;
+	}
+	Value(int val) : ptr_(new IntValue(val)) {
+	}
+	Value(Func val) : ptr_(new FuncValue(val)) {
+	}
+	operator int&() {
+		return static_cast<int&>(*ptr_);
+	}
+	operator Func&() {
+		return static_cast<Func&>(*ptr_);
+	}
+	operator bool() {
+		return static_cast<int>(*ptr_);
+	}
+	~Value() {
+		delete ptr_;
+	}
+};
+
+using VarsT = std::map<std::string, Value>;
 
 struct Expr : public Node, public IExecable{
-	virtual IValue *eval() = 0;
-	void exec() {
-		IValue *res = nullptr;
-		try {
-			res = eval();
-		} catch (std::logic_error& err)
-		{
-			std::cout << "Semantic error: " << err.what() << std::endl;
-		}
-		delete res;
-	}
+	virtual Value eval() = 0;
+	void exec();
 	Scope *getScope();
 };
 
 struct BinOp : public Node, public INode {
 	template <typename F>
-	IValue *as_int(F functor, Expr *lhs, Expr *rhs) {
+	Value as_int(F functor, Expr *lhs, Expr *rhs) {
 		auto val_l = lhs->eval();
 		auto val_r = rhs->eval();
-		val_l->get_int() = functor(val_l->get_int(), val_r->get_int());
-		delete val_r;
+		val_l = functor(val_l, val_r);
 		return val_l;
 	}
-	virtual IValue *operator() (Expr *lhs, Expr *rhs) = 0;
+	virtual Value operator() (Expr *lhs, Expr *rhs) = 0;
 };
 
 struct UnOp : public Node, public INode {
 	template <typename F>
-	IValue *as_int(F functor, Expr *rhs) {
+	Value as_int(F functor, Expr *rhs) {
 		auto val = rhs->eval();
-		val->get_int() = functor(val->get_int());
+		val = functor(val);
 		return val;
 	}
-	virtual IValue *operator() (Expr *rhs) = 0;
+	virtual Value operator() (Expr *rhs) = 0;
 };
 
 struct BlockList : public Expr {
@@ -103,14 +151,7 @@ struct BlockList : public Expr {
 		cner_.push_back(expr);
 		expr->parent_ = this;
 	}
-	IValue *eval() override {
-		IValue *res = IValue::defaultValue();
-		for (auto expr : cner_) {
-			delete res;
-			res = expr->eval();
-		}
-		return res;
-	}
+	Value eval() override;
 };
 
 struct DeclList : public INode {
@@ -162,41 +203,11 @@ struct Scope : public Expr {
 	}
 	~Scope() {
 		delete blocks;
-		for (auto elem : vars_)
-			delete elem.second;
 	}
-	IValue *eval() override {
-		if (blocks)
-			return blocks->eval();
-		return IValue::defaultValue();
-	}
-	bool assign(const std::string &name, IValue *new_val, bool forse_flag = true) {
-		auto dest_it = vars_.find(name);
-		if (dest_it != vars_.end()) {
-			auto &dest = dest_it->second;
-			if (dest != new_val) {
-				delete dest;
-				dest = new_val;
-			}
-			return true;
-		}
-		else if (forse_flag) {
-			vars_[name] = new_val;
-		}
-		return forse_flag;
-	}
-	IValue *resolve(const std::string &name) const {
-		auto it = vars_.find(name);
-		return it != vars_.cend() ? it->second->clone() : nullptr; 
-	}
+	Value eval() override; 
+	bool assign(const std::string &name, Value new_val, bool forse_flag = true);
+	std::optional<Value> resolve(const std::string &name) const;
 };
-
-inline Scope *Expr::getScope() {
-	auto node = parent_;
-	while (node && (typeid(*node) != typeid(Scope)))
-		node = node->parent_;
-	return static_cast<Scope *>(node);
-}
 
 struct StmExpr : public Expr {
 	Expr *expr;
@@ -206,9 +217,7 @@ struct StmExpr : public Expr {
 	~StmExpr() {
 		delete expr;
 	}
-	IValue *eval() override {
-		return expr->eval();
-	}
+	Value eval() override;
 };
 
 struct StmPrint : public Expr {
@@ -219,11 +228,7 @@ struct StmPrint : public Expr {
 	~StmPrint() {
 		delete expr;
 	}
-	IValue *eval() override {
-		auto val = expr->eval();
-		std::cout << val->get_int() << std::endl;
-		return val;
-	}
+	Value eval() override;
 };
 
 struct StmWhile : public Expr {
@@ -237,17 +242,7 @@ struct StmWhile : public Expr {
 		delete expr;
 		delete block;
 	}
-	IValue *eval() override {
-		IValue *res = IValue::defaultValue();
-		IValue *cond;
-		while ((cond = expr->eval())->get_int()) {
-			delete cond;
-			delete res;
-			res = block->eval();
-		}
-		delete cond;
-		return res;
-	}
+	Value eval() override;
 };
 
 struct StmIf : public Expr {
@@ -265,23 +260,12 @@ struct StmIf : public Expr {
 		delete true_block;
 		delete false_block;
 	}
-	IValue *eval() override {
-		auto cond = expr->eval();
-		IValue *res;
-		if (cond->get_int())
-			res = true_block->eval();
-		else if (false_block)
-			res = false_block->eval();
-		else
-			res = IValue::defaultValue();
-		delete cond;
-		return res;
-	}
+	Value eval() override;
 };
 
 struct ReturnExcept {
-	IValue *val_;
-	ReturnExcept(IValue *val) : val_(val) {
+	Value val_;
+	ReturnExcept(Value val) : val_(val) {
 	}
 };
 
@@ -293,32 +277,21 @@ struct StmReturn : public Expr {
 	~StmReturn() {
 		delete expr_;
 	}
-	IValue *eval() {
-		throw ReturnExcept(expr_->eval());
-	}
+	Value eval() override;
 };
 
 struct ExprInt : public Expr {
 	int val;
 	ExprInt(int i) : val(i)
 	{}
-	IValue *eval() override {
-		return new IntValue{val};
-	}
+	Value eval() override;
 };
 
 struct ExprId : public Expr {
 	std::string name;
 	ExprId(std::string n) : name(n)
 	{}
-	IValue *eval() override {
-		for (auto scope = getScope(); scope; scope = scope->getScope()) {
-			auto val = scope->resolve(name);
-			if (val)
-				return val;
-		}
-		return IValue::defaultValue();
-	}
+	Value eval() override;
 };
 
 struct ExprFunc : public Expr {
@@ -332,75 +305,11 @@ struct ExprFunc : public Expr {
 		delete body;
 		delete decls;
 	}
-	IValue *eval() override;
+	Value eval() override;
 };
-
-
-struct Func {
-	Scope *body_;
-	DeclList *decls_;
-	Func(ExprFunc *func) : body_(func->body), decls_(func->decls) 
-	{}
-	IValue *operator () (ExprList *ops) {
-		auto prev_vars = body_->vars_;
-		if (ops->size() != decls_->size())
-			throw std::logic_error("incorrect number of arguments in application");
-		auto it = decls_->begin();
-		for (auto expr : *ops)
-			body_->vars_[*it++] = expr->eval();
-		IValue *res;
-		try {
-			res = body_->eval();
-		} catch (ReturnExcept &ret) {
-			res = ret.val_;
-		}
-		for (auto name : *decls_)
-			delete body_->vars_.at(name);
-		body_->vars_ = prev_vars;
-		return res;
-	}
-};
-
-
-struct FuncValue : public IValue {
-	private:
-	Func func_;
-	public:
-	int &get_int() override {
-		throw std::logic_error("Func as Int");
-	}
-	Func &get_Func() override {
-		return func_;
-	}
-	FuncValue &operator = (const IValue &rhs) override {
-		func_ = static_cast<const FuncValue &>(rhs).func_;
-		return *this;
-	}
-	FuncValue *clone() const override {
-		return new FuncValue(func_);
-	}
-	FuncValue(Func f) : func_(f)
-	{}
-};
-
-inline IValue *ExprFunc::eval() {
-	if (id) {
-		auto node = parent_;
-		while (node->parent_)
-			node = node->parent_;
-		static_cast<Scope *>(node)->assign(id->name, new FuncValue(this));
-		delete id;
-		id = nullptr;
-	}
-	return new FuncValue(this);
-}
 
 struct ExprQmark : public Expr {
-	IValue *eval() override {
-		int val;
-		std::cin >> val;
-		return new IntValue{val};
-	}
+	Value eval() override;
 };
 struct ExprAssign : public Expr {
 	ExprId *id;
@@ -413,15 +322,7 @@ struct ExprAssign : public Expr {
 		delete id;
 		delete expr;
 	}
-	IValue *eval() override {
-		IValue *val = expr->eval();
-		const auto &name = id->name;
-		bool flag;
-		for (auto scope = getScope(); scope && (flag = !scope->assign(name, val, false)); scope = scope->getScope())
-			;
-		if (flag) getScope()->assign(name, val);
-		return  val->clone();
-	}
+	Value eval() override;
 };
 
 struct ExprApply : public Expr {
@@ -436,12 +337,7 @@ struct ExprApply : public Expr {
 		delete id;
 		delete ops;
 	}
-	IValue *eval() override {
-		auto val = id->eval();
-		auto res = val->get_Func()(ops);
-		delete val;
-		return res;
-	}
+	Value eval() override;
 };
 
 struct ExprBinOp : public Expr {
@@ -458,9 +354,7 @@ struct ExprBinOp : public Expr {
 		delete lhs;
 		delete rhs;
 	}
-	IValue *eval() override {
-		return (*op)(lhs, rhs);
-	}
+	Value eval() override;
 };
 
 struct ExprUnOp : public Expr {
@@ -474,76 +368,78 @@ struct ExprUnOp : public Expr {
 		delete op;
 		delete rhs;
 	}
-	IValue *eval() override {
-		return (*op)(rhs);
-	}
+	Value eval() override;
 };
 
 struct BinOpMul : public BinOp {
-	IValue *operator() (Expr *lhs, Expr *rhs) override {
-		return as_int([](int a, int b){ return a * b; }, lhs, rhs);
+	Value operator() (Expr *lhs, Expr *rhs) override {
+		return as_int(std::multiplies<int>{}, lhs, rhs);
 	}
 };
 
 struct BinOpDiv : public BinOp {
-	IValue *operator() (Expr *lhs, Expr *rhs) override {
-		return as_int([](int a, int b) { return a / b; }, lhs, rhs);
+	Value operator() (Expr *lhs, Expr *rhs) override {
+		return as_int(std::divides<int>{}, lhs, rhs);
 	}
 };
 struct BinOpPlus : public BinOp {
-	IValue *operator() (Expr *lhs, Expr *rhs) override {
-		return as_int([](int a, int b) { return a + b; }, lhs, rhs);
+	Value operator() (Expr *lhs, Expr *rhs) override {
+		return as_int(std::plus<int>{}, lhs, rhs);
 	}
 };
 struct BinOpMinus : public BinOp {
-	IValue *operator() (Expr *lhs, Expr *rhs) override {
-		return as_int([](int a, int b) { return a - b; }, lhs, rhs);
+	Value operator() (Expr *lhs, Expr *rhs) override {
+		return as_int(std::minus<int>{}, lhs, rhs);
 	}
 };
 struct BinOpLess : public BinOp {
-	IValue *operator() (Expr *lhs, Expr *rhs) override {
-		return as_int([](int a, int b) { return a < b; }, lhs, rhs);
+	Value operator() (Expr *lhs, Expr *rhs) override {
+		return as_int(std::less<int>{}, lhs, rhs);
 	}
 };
 struct BinOpGrtr : public BinOp {
-	IValue *operator() (Expr *lhs, Expr *rhs) override {
-		return as_int([](int a, int b) { return a > b; }, lhs, rhs);
+	Value operator() (Expr *lhs, Expr *rhs) override {
+		return as_int(std::greater<int>{}, lhs, rhs);
 	}
 };
 struct BinOpLessOrEq : public BinOp {
-	IValue *operator() (Expr *lhs, Expr *rhs) override {
-		return as_int([](int a, int b) { return a <= b; }, lhs, rhs);
+	Value operator() (Expr *lhs, Expr *rhs) override {
+		return as_int(std::less_equal<int>{}, lhs, rhs);
 	}
 };
 struct BinOpGrtrOrEq : public BinOp {
-	IValue *operator() (Expr *lhs, Expr *rhs) override {
-		return as_int([](int a, int b) { return a >= b; }, lhs, rhs);
+	Value operator() (Expr *lhs, Expr *rhs) override {
+		return as_int(std::greater_equal<int>{}, lhs, rhs);
 	}
 };
 struct BinOpEqual : public BinOp {
-	IValue *operator() (Expr *lhs, Expr *rhs) override {
-		return as_int([](int a, int b) { return a == b; }, lhs, rhs);
+	Value operator() (Expr *lhs, Expr *rhs) override {
+		return as_int(std::equal_to<int>{}, lhs, rhs);
 	}
 };
 struct BinOpNotEqual : public BinOp {
-	IValue *operator() (Expr *lhs, Expr *rhs) override {
-		return as_int([](int a, int b) { return a != b; }, lhs, rhs);
+	Value operator() (Expr *lhs, Expr *rhs) override {
+		return as_int(std::not_equal_to<int>{}, lhs, rhs);
 	}
 };
 
 struct UnOpPlus : public UnOp {
-	IValue *operator() (Expr *rhs) override {
+	Value operator() (Expr *rhs) override {
 		return as_int([](int a) { return +a; }, rhs);
 	}
 };
 struct UnOpMinus : public UnOp {
-	IValue *operator() (Expr *rhs) override {
-		return as_int([](int a) { return -a; }, rhs);
+	Value operator() (Expr *rhs) override {
+		return as_int(std::negate<int>{}, rhs);
 	}
 };
 struct UnOpNot : public UnOp {
-	IValue *operator() (Expr *rhs) override {
-		return as_int([](int a) { return !a; }, rhs);
+	Value operator() (Expr *rhs) override {
+		return as_int(std::logical_not<int>{}, rhs);
 	}
 };
+#if 0
+Func::Func(ExprFunc *func) : body_(func->body), decls_(func->decls) 
+{}
+#endif
 }
