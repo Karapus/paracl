@@ -19,7 +19,7 @@ struct IValue {
 	virtual operator int&() = 0;
 	virtual operator Func&() = 0;
 	virtual IValue *clone() const = 0;
-	virtual ~IValue() {};
+	virtual ~IValue() = default;
 	static IValue *defaultValue();
 };
 
@@ -27,7 +27,8 @@ struct IValue {
 struct Scope;
 struct Node {
 	Node *parent_ = nullptr;
-	virtual ~Node() {};
+	virtual ~Node() = default;
+
 };
 
 struct IntValue : public IValue {
@@ -114,7 +115,7 @@ using VarsT = std::map<std::string, Value>;
 
 struct Expr : public Node, public IExecable{
 	virtual Value eval() = 0;
-	void exec();
+	void exec() override;
 	Scope *getScope();
 };
 
@@ -196,6 +197,7 @@ struct ExprList : public INode {
 
 struct Scope : public Expr {
 	VarsT vars_;
+public:
 	BlockList *blocks;
 	Scope(BlockList *b) : blocks(b) {
 		if (blocks)
@@ -210,55 +212,63 @@ struct Scope : public Expr {
 };
 
 struct StmExpr : public Expr {
-	Expr *expr;
-	StmExpr(Expr *e) : expr(e) {
-		expr->parent_ = this;
+private:
+	Expr *expr_;
+public:
+	StmExpr(Expr *e) : expr_(e) {
+		expr_->parent_ = this;
 	}
 	~StmExpr() {
-		delete expr;
+		delete expr_;
 	}
 	Value eval() override;
 };
 
 struct StmPrint : public Expr {
-	Expr *expr;
-	StmPrint(Expr *e) : expr(e) {
-		expr->parent_ = this;
+private:
+	Expr *expr_;
+public:
+	StmPrint(Expr *e) : expr_(e) {
+		expr_->parent_ = this;
 	}
 	~StmPrint() {
-		delete expr;
+		delete expr_;
 	}
 	Value eval() override;
 };
 
 struct StmWhile : public Expr {
-	Expr *expr;
-	Expr *block;
-	StmWhile(Expr *e, Expr *b) : expr(e), block(b) {
-		expr->parent_ = this;
-		block->parent_ = this;
+private:
+	Expr *expr_;
+	Expr *block_;
+public:
+	StmWhile(Expr *e, Expr *b) : expr_(e), block_(b) {
+		expr_->parent_ = this;
+		block_->parent_ = this;
 	}
 	~StmWhile() {
-		delete expr;
-		delete block;
+		delete expr_;
+		delete block_;
 	}
 	Value eval() override;
 };
 
 struct StmIf : public Expr {
-	Expr *expr;
-	Expr *true_block;
-	Expr *false_block;
-	StmIf(Expr *e, Expr *tb, Expr *fb) : expr(e), true_block(tb), false_block(fb) {
-		expr->parent_ = this;
-		true_block->parent_ = this;
-		if (false_block)
-			false_block->parent_ = this;
+private:
+	Expr *expr_;
+	Expr *true_block_;
+	Expr *false_block_;
+public:
+	StmIf(Expr *e, Expr *tb, Expr *fb) : expr_(e), true_block_(tb), false_block_(fb) {
+		expr_->parent_ = this;
+		true_block_->parent_ = this;
+		if (false_block_)
+			false_block_->parent_ = this;
 	}
 	~StmIf() {
-		delete expr;
-		delete true_block;
-		delete false_block;
+		delete expr_;
+		delete true_block_;
+		delete false_block_;
 	}
 	Value eval() override;
 };
@@ -270,7 +280,9 @@ struct ReturnExcept {
 };
 
 struct StmReturn : public Expr {
+private:
 	Expr *expr_;
+public:
 	StmReturn(Expr *expr) : expr_(expr) {
 		expr_->parent_ = this;
 	}
@@ -281,29 +293,31 @@ struct StmReturn : public Expr {
 };
 
 struct ExprInt : public Expr {
-	int val;
-	ExprInt(int i) : val(i)
+private:
+	int val_;
+public:
+	ExprInt(int i) : val_(i)
 	{}
 	Value eval() override;
 };
 
 struct ExprId : public Expr {
-	std::string name;
-	ExprId(std::string n) : name(n)
+	std::string name_;
+	ExprId(std::string n) : name_(n)
 	{}
 	Value eval() override;
 };
 
 struct ExprFunc : public Expr {
-	Scope *body;
-	DeclList *decls;
-	ExprId *id;
-	ExprFunc(Scope *b, DeclList *d, ExprId *i = nullptr) : body(b), decls(d), id(i) {
-		body->parent_ = this;
+	Scope *body_;
+	DeclList *decls_;
+	ExprId *id_;
+	ExprFunc(Scope *b, DeclList *d, ExprId *i = nullptr) : body_(b), decls_(d), id_(i) {
+		body_->parent_ = this;
 			}
 	~ExprFunc() {
-		delete body;
-		delete decls;
+		delete body_;
+		delete decls_;
 	}
 	Value eval() override;
 };
@@ -312,61 +326,69 @@ struct ExprQmark : public Expr {
 	Value eval() override;
 };
 struct ExprAssign : public Expr {
-	ExprId *id;
-	Expr *expr;
-	ExprAssign(ExprId *i, Expr *e) : id(i), expr(e) {
-		id->parent_ = this;
-		expr->parent_ = this;
+private:
+	ExprId *id_;
+	Expr *expr_;
+public:
+	ExprAssign(ExprId *i, Expr *e) : id_(i), expr_(e) {
+		id_->parent_ = this;
+		expr_->parent_ = this;
 	}
 	~ExprAssign() {
-		delete id;
-		delete expr;
+		delete id_;
+		delete expr_;
 	}
 	Value eval() override;
 };
 
 struct ExprApply : public Expr {
-	ExprId *id;
-	ExprList *ops;
-	ExprApply(ExprId *i, ExprList *o) : id(i), ops(o) {
-		id->parent_ = this;
-		for (auto expr : *ops)
+private:
+	ExprId *id_;
+	ExprList *ops_;
+public:
+	ExprApply(ExprId *i, ExprList *o) : id_(i), ops_(o) {
+		id_->parent_ = this;
+		for (auto expr : *ops_)
 			expr->parent_ = this;
 	}
 	~ExprApply() {
-		delete id;
-		delete ops;
+		delete id_;
+		delete ops_;
 	}
 	Value eval() override;
 };
 
 struct ExprBinOp : public Expr {
-	BinOp *op;
-	Expr *lhs;
-	Expr *rhs;
-	ExprBinOp(BinOp *o, Expr *l, Expr *r) : op(o), lhs(l), rhs(r) {
-		op->parent_ = this;
-		lhs->parent_ = this;
-		rhs->parent_ = this;
+private:
+	BinOp *op_;
+	Expr *lhs_;
+	Expr *rhs_;
+public:
+	ExprBinOp(BinOp *o, Expr *l, Expr *r) : op_(o), lhs_(l), rhs_(r) {
+		op_->parent_ = this;
+		lhs_->parent_ = this;
+		rhs_->parent_ = this;
 	}
 	~ExprBinOp() {
-		delete op;
-		delete lhs;
-		delete rhs;
+		delete op_;
+		delete lhs_;
+		delete rhs_;
 	}
 	Value eval() override;
 };
 
 struct ExprUnOp : public Expr {
-	UnOp *op;
-	Expr *rhs;
-	ExprUnOp(UnOp *o, Expr *r) : op(o), rhs(r) {
-		op->parent_ = this;
-		rhs->parent_ = this;
+private:
+	UnOp *op_;
+	Expr *rhs_;
+public:
+	ExprUnOp(UnOp *o, Expr *r) : op_(o), rhs_(r) {
+		op_->parent_ = this;
+		rhs_->parent_ = this;
 	}
 	~ExprUnOp() {
-		delete op;
-		delete rhs;
+		delete op_;
+		delete rhs_;
 	}
 	Value eval() override;
 };

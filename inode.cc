@@ -97,7 +97,7 @@ INode *AST::makeExprFunc(INode *scope, INode *declist, INode *id) {
 }
 
 INode *AST::makeDeclList(INode *declist, INode *id) {
-	static_cast<DeclList *>(declist)->push_back(static_cast<ExprId *>(id)->name);
+	static_cast<DeclList *>(declist)->push_back(static_cast<ExprId *>(id)->name_);
 	delete id;
 	return declist;
 }

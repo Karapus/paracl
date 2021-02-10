@@ -3,92 +3,6 @@
 namespace AST {
 
 struct Func;
-#if 0
-struct IValue {
-	virtual operator int&() = 0;
-	virtual operator Func&() = 0;
-	virtual IValue *clone() const = 0;
-	virtual ~IValue() {};
-	static IValue *defaultValue();
-};
-
-
-struct IntValue : public IValue {
-private:
-	int val_;
-public:
-	operator int&() override {
-		return val_;
-	}
-	operator Func&() override {
-		throw std::logic_error("Int as Func");
-	}
-	IntValue *clone() const override {
-		return new IntValue(val_);
-	}
-	IntValue(int val) : val_(val)
-	{}
-};
-
-struct Func {
-	Scope *body_;
-	DeclList *decls_;
-	Func(ExprFunc *func);
-	Value operator () (ExprList *ops);
-};
-
-struct FuncValue : public IValue {
-	private:
-	Func func_;
-	public:
-	operator int&() override {
-		throw std::logic_error("Func as Int");
-	}
-	operator Func&() override {
-		return func_;
-	}
-	FuncValue *clone() const override {
-		return new FuncValue(func_);
-	}
-	FuncValue(Func f) : func_(f)
-	{}
-};
-
-struct Value {
-	private:
-	IValue *ptr_;
-	public:
-	Value() : ptr_(IValue::defaultValue()) {
-	}
-	Value(const Value &rhs) {
-		ptr_ = rhs.ptr_->clone();
-	}
-	Value &operator = (const Value &rhs) {
-		if (this != &rhs) {
-			delete ptr_;
-			ptr_ = rhs.ptr_->clone();
-		}
-		return *this;			
-	}
-	Value(int val) : ptr_(new IntValue(val)) {
-	}
-	Value(Func val) : ptr_(new FuncValue(val)) {
-	}
-	operator int&() {
-		return static_cast<int&>(*ptr_);
-	}
-	operator Func&() {
-		return static_cast<Func&>(*ptr_);
-	}
-	operator bool() {
-		return static_cast<int>(*ptr_);
-	}
-	~Value() {
-		delete ptr_;
-	}
-};
-
-#endif
 
 IValue *IValue::defaultValue() {
 	return new IntValue{0};
@@ -103,71 +17,15 @@ void Expr::exec() {
 		std::cout << "Semantic error: " << err.what() << std::endl;
 	}
 }
-#if 0
-struct BlockList : public Expr {
-	private:
-	std::vector<Expr *> cner_;
-	public:
-	~BlockList() {
-		for (auto expr : cner_)
-			delete expr;
-	}
-	void push_back(Expr *expr) {
-		cner_.push_back(expr);
-		expr->parent_ = this;
-	}
-#endif
-	Value BlockList::eval() {
-		Value res;
-		for (auto expr : cner_) {
-			res = expr->eval();
-		}
-		return res;
-	}
-#if 0
-};
 
-struct DeclList : public INode {
-	private:
-	std::vector<std::string> cner_;
-	public:
-	auto begin() {
-		return cner_.begin();
+Value BlockList::eval() {
+	Value res;
+	for (auto expr : cner_) {
+		res = expr->eval();
 	}
-	auto end() {
-		return cner_.end();
-	}
-	auto size() const {
-		return cner_.size();
-	}
-	auto push_back(const std::string &x) {
-		return cner_.push_back(x);
-	}
-};
+	return res;
+}
 
-struct ExprList : public INode {
-	private:
-	std::vector<Expr *> cner_;
-	public:
-	~ExprList() {
-		for (auto expr : cner_)
-			delete expr;
-	}
-	auto begin() {
-		return cner_.begin();
-	}
-	auto end() {
-		return cner_.end();
-	}
-	auto size() const {
-		return cner_.size();
-	}
-	auto push_back(Expr *expr) {
-		return cner_.push_back(expr);
-	}
-};
-
-#endif
 Value Scope::eval() {
 	if (blocks)
 		return blocks->eval();
@@ -198,28 +56,28 @@ Scope *Expr::getScope() {
 }
 
 Value StmExpr::eval() {
-	return expr->eval();
+	return expr_->eval();
 }
 
 Value StmPrint::eval() {
-	auto val = expr->eval();
+	auto val = expr_->eval();
 	std::cout << static_cast<int>(val) << std::endl;
 	return val;
 }
 
 Value StmWhile::eval() {
 	Value res;
-	while (expr->eval()) {
-		res = block->eval();
+	while (expr_->eval()) {
+		res = block_->eval();
 	}
 	return res;
 }
 
 Value StmIf::eval() {
-	if (expr->eval())
-		return true_block->eval();
-	if (false_block)
-		return false_block->eval();
+	if (expr_->eval())
+		return true_block_->eval();
+	if (false_block_)
+		return false_block_->eval();
 	return Value{};
 }
 
@@ -228,12 +86,12 @@ Value StmReturn::eval() {
 }
 
 Value ExprInt::eval() {
-	return Value{val};
+	return Value{val_};
 }
 
 Value ExprId::eval() {
 	for (auto scope = getScope(); scope; scope = scope->getScope()) {
-		auto val = scope->resolve(name);
+		auto val = scope->resolve(name_);
 		if (val)
 			return *val;
 	}
@@ -259,13 +117,13 @@ Value Func::operator () (ExprList *ops) {
 
 Value ExprFunc::eval() {
 	auto val = Value(this);
-	if (id) {
+	if (id_) {
 		auto node = parent_;
 		while (node->parent_)
 			node = node->parent_;
-		static_cast<Scope *>(node)->assign(id->name, val);
-		delete id;
-		id = nullptr;
+		static_cast<Scope *>(node)->assign(id_->name_, val);
+		delete id_;
+		id_ = nullptr;
 	}
 	return val;
 }
@@ -277,8 +135,8 @@ Value ExprQmark::eval() {
 }
 
 Value ExprAssign::eval() {
-	Value val = expr->eval();
-	const auto &name = id->name;
+	Value val = expr_->eval();
+	const auto &name = id_->name_;
 	bool flag;
 	for (auto scope = getScope(); scope && (flag = !scope->assign(name, val, false)); scope = scope->getScope())
 		;
@@ -287,17 +145,17 @@ Value ExprAssign::eval() {
 }
 
 Value ExprApply::eval() {
-	return static_cast<Func>(id->eval())(ops);
+	return static_cast<Func>(id_->eval())(ops_);
 }
 
 Value ExprBinOp::eval() {
-	return (*op)(lhs, rhs);
+	return (*op_)(lhs_, rhs_);
 }
 
 Value ExprUnOp::eval() {
-	return (*op)(rhs);
+	return (*op_)(rhs_);
 }
 
-Func::Func(ExprFunc *func) : body_(func->body), decls_(func->decls) 
+Func::Func(ExprFunc *func) : body_(func->body_), decls_(func->decls_) 
 {}
 }
