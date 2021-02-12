@@ -145,15 +145,15 @@ Value ExprAssign::eval() {
 }
 
 Value ExprApply::eval() {
-	return static_cast<Func>(id_->eval())(ops_);
+	return static_cast<Func>(id_->eval())(ops_.get());
 }
 
 Value ExprBinOp::eval() {
-	return (*op_)(lhs_, rhs_);
+	return (*op_)(lhs_.get(), rhs_.get());
 }
 
 Value ExprUnOp::eval() {
-	return (*op_)(rhs_);
+	return (*op_)(rhs_.get());
 }
 
 Func::Func(ExprFunc *func) : body_(func->body_), decls_(func->decls_) 

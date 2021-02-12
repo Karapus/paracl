@@ -10,6 +10,7 @@
 #include <typeinfo>
 #include <optional>
 #include <functional>
+#include <memory>
 
 namespace AST {
 
@@ -197,7 +198,6 @@ struct ExprList : public INode {
 
 struct Scope : public Expr {
 	VarsT vars_;
-public:
 	BlockList *blocks;
 	Scope(BlockList *b) : blocks(b) {
 		if (blocks)
@@ -213,62 +213,47 @@ public:
 
 struct StmExpr : public Expr {
 private:
-	Expr *expr_;
+	std::unique_ptr<Expr> expr_;
 public:
 	StmExpr(Expr *e) : expr_(e) {
 		expr_->parent_ = this;
-	}
-	~StmExpr() {
-		delete expr_;
 	}
 	Value eval() override;
 };
 
 struct StmPrint : public Expr {
 private:
-	Expr *expr_;
+	std::unique_ptr<Expr> expr_;
 public:
 	StmPrint(Expr *e) : expr_(e) {
 		expr_->parent_ = this;
-	}
-	~StmPrint() {
-		delete expr_;
 	}
 	Value eval() override;
 };
 
 struct StmWhile : public Expr {
 private:
-	Expr *expr_;
-	Expr *block_;
+	std::unique_ptr<Expr> expr_;
+	std::unique_ptr<Expr> block_;
 public:
 	StmWhile(Expr *e, Expr *b) : expr_(e), block_(b) {
 		expr_->parent_ = this;
 		block_->parent_ = this;
-	}
-	~StmWhile() {
-		delete expr_;
-		delete block_;
 	}
 	Value eval() override;
 };
 
 struct StmIf : public Expr {
 private:
-	Expr *expr_;
-	Expr *true_block_;
-	Expr *false_block_;
+	std::unique_ptr<Expr> expr_;
+	std::unique_ptr<Expr> true_block_;
+	std::unique_ptr<Expr> false_block_;
 public:
 	StmIf(Expr *e, Expr *tb, Expr *fb) : expr_(e), true_block_(tb), false_block_(fb) {
 		expr_->parent_ = this;
 		true_block_->parent_ = this;
 		if (false_block_)
 			false_block_->parent_ = this;
-	}
-	~StmIf() {
-		delete expr_;
-		delete true_block_;
-		delete false_block_;
 	}
 	Value eval() override;
 };
@@ -281,13 +266,10 @@ struct ReturnExcept {
 
 struct StmReturn : public Expr {
 private:
-	Expr *expr_;
+	std::unique_ptr<Expr> expr_;
 public:
 	StmReturn(Expr *expr) : expr_(expr) {
 		expr_->parent_ = this;
-	}
-	~StmReturn() {
-		delete expr_;
 	}
 	Value eval() override;
 };
@@ -314,7 +296,7 @@ struct ExprFunc : public Expr {
 	ExprId *id_;
 	ExprFunc(Scope *b, DeclList *d, ExprId *i = nullptr) : body_(b), decls_(d), id_(i) {
 		body_->parent_ = this;
-			}
+	}
 	~ExprFunc() {
 		delete body_;
 		delete decls_;
@@ -327,68 +309,51 @@ struct ExprQmark : public Expr {
 };
 struct ExprAssign : public Expr {
 private:
-	ExprId *id_;
-	Expr *expr_;
+	std::unique_ptr<ExprId> id_;
+	std::unique_ptr<Expr> expr_;
 public:
 	ExprAssign(ExprId *i, Expr *e) : id_(i), expr_(e) {
 		id_->parent_ = this;
 		expr_->parent_ = this;
-	}
-	~ExprAssign() {
-		delete id_;
-		delete expr_;
 	}
 	Value eval() override;
 };
 
 struct ExprApply : public Expr {
 private:
-	ExprId *id_;
-	ExprList *ops_;
+	std::unique_ptr<ExprId> id_;
+	std::unique_ptr<ExprList> ops_;
 public:
 	ExprApply(ExprId *i, ExprList *o) : id_(i), ops_(o) {
 		id_->parent_ = this;
 		for (auto expr : *ops_)
 			expr->parent_ = this;
 	}
-	~ExprApply() {
-		delete id_;
-		delete ops_;
-	}
 	Value eval() override;
 };
 
 struct ExprBinOp : public Expr {
 private:
-	BinOp *op_;
-	Expr *lhs_;
-	Expr *rhs_;
+	std::unique_ptr<BinOp> op_;
+	std::unique_ptr<Expr> lhs_;
+	std::unique_ptr<Expr> rhs_;
 public:
 	ExprBinOp(BinOp *o, Expr *l, Expr *r) : op_(o), lhs_(l), rhs_(r) {
 		op_->parent_ = this;
 		lhs_->parent_ = this;
 		rhs_->parent_ = this;
 	}
-	~ExprBinOp() {
-		delete op_;
-		delete lhs_;
-		delete rhs_;
-	}
 	Value eval() override;
 };
 
 struct ExprUnOp : public Expr {
 private:
-	UnOp *op_;
-	Expr *rhs_;
+	std::unique_ptr<UnOp> op_;
+	std::unique_ptr<Expr> rhs_;
 public:
 	ExprUnOp(UnOp *o, Expr *r) : op_(o), rhs_(r) {
 		op_->parent_ = this;
 		rhs_->parent_ = this;
-	}
-	~ExprUnOp() {
-		delete op_;
-		delete rhs_;
 	}
 	Value eval() override;
 };
@@ -460,8 +425,4 @@ struct UnOpNot : public UnOp {
 		return as_int(std::logical_not<int>{}, rhs);
 	}
 };
-#if 0
-Func::Func(ExprFunc *func) : body_(func->body), decls_(func->decls) 
-{}
-#endif
 }
