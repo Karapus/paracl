@@ -21,7 +21,6 @@ struct IValue {
 	virtual operator Func&() = 0;
 	virtual IValue *clone() const = 0;
 	virtual ~IValue() = default;
-	static IValue *defaultValue();
 };
 
 
@@ -78,11 +77,23 @@ struct FuncValue : public IValue {
 	{}
 };
 
+struct DefaultValue : public IValue {
+	operator int&() override {
+		throw std::logic_error("Undefined value as Int");
+	}
+	operator Func&() override {
+		throw std::logic_error("Undefined value as Func");
+	}
+	DefaultValue *clone() const override {
+		return new DefaultValue{};
+	}
+};
+
 struct Value {
 	private:
 	IValue *ptr_;
 	public:
-	Value() : ptr_(IValue::defaultValue()) {
+	Value() : ptr_(new DefaultValue{}) {
 	}
 	Value(const Value &rhs) {
 		ptr_ = rhs.ptr_->clone();

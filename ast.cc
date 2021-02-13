@@ -4,17 +4,14 @@ namespace AST {
 
 struct Func;
 
-IValue *IValue::defaultValue() {
-	return new IntValue{0};
-}
-
 void Expr::exec() {
 	Value res;
 	try {
 		res = eval();
-	} catch (std::logic_error& err)
-	{
+	} catch (std::logic_error& err) {
 		std::cout << "Semantic error: " << err.what() << std::endl;
+	} catch (ReturnExcept&) {
+		std::cout << "Return outside of function" << std::endl;
 	}
 }
 
