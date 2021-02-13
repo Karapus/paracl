@@ -197,17 +197,25 @@ struct ExprList : public INode {
 };
 
 struct Scope : public Expr {
+	private:
 	VarsT vars_;
 	BlockList *blocks;
+	public:
 	Scope(BlockList *b) : blocks(b) {
-		if (blocks)
-			blocks->parent_ = this;
+		blocks->parent_ = this;
 	}
 	~Scope() {
 		delete blocks;
 	}
+	VarsT getVars() const {
+		return vars_;
+	}
+	void setVars(const VarsT vars) {
+		vars_ = vars;
+	}
 	Value eval() override; 
-	bool assign(const std::string &name, Value new_val, bool forse_flag = true);
+	void assign(const std::string &name, Value new_val);
+	bool insert(const std::string &name, Value new_val);
 	std::optional<Value> resolve(const std::string &name) const;
 };
 

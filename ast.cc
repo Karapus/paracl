@@ -32,15 +32,12 @@ Value Scope::eval() {
 	return Value{};
 }
 
-bool Scope::assign(const std::string &name, Value new_val, bool forse_flag) {
-	auto dest_it = vars_.find(name);
-	if (dest_it != vars_.end()) {
-		dest_it->second = new_val;
-		return true;
-	}
-	else if (forse_flag)
-		vars_[name] = new_val;
-	return forse_flag;
+void Scope::assign(const std::string &name, Value new_val) {
+	vars_.insert_or_assign(name, new_val);
+}
+
+bool Scope::insert(const std::string &name, Value new_val) {
+	return vars_.insert(std::make_pair(name, new_val)).second;
 }
 
 std::optional<Value> Scope::resolve(const std::string &name) const {
@@ -99,19 +96,19 @@ Value ExprId::eval() {
 }
 
 Value Func::operator () (ExprList *ops) {
-	auto prev_vars = body_->vars_;
+	auto prev_vars = body_->getVars();
 	if (ops->size() != decls_->size())
 		throw std::logic_error("incorrect number of arguments in application");
 	auto it = decls_->begin();
 	for (auto expr : *ops)
-		body_->vars_[*it++] = expr->eval();
+		body_->assign(*it++, expr->eval());
 	Value res;
 	try {
 		res = body_->eval();
 	} catch (ReturnExcept &ret) {
 		res = ret.val_;
 	}
-	body_->vars_ = prev_vars;
+	body_->setVars(prev_vars);
 	return res;
 }
 
@@ -138,9 +135,10 @@ Value ExprAssign::eval() {
 	Value val = expr_->eval();
 	const auto &name = id_->name_;
 	bool flag;
-	for (auto scope = getScope(); scope && (flag = !scope->assign(name, val, false)); scope = scope->getScope())
+	for (auto scope = getScope(); scope && (flag = !scope->insert(name, val)); scope = scope->getScope())
 		;
-	if (flag) getScope()->assign(name, val);
+	if (flag)
+		getScope()->assign(name, val);
 	return  val;
 }
 
