@@ -49,6 +49,13 @@ Scope *Expr::getScope() {
 	return static_cast<Scope *>(node);
 }
 
+Scope *Expr::getGlobalScope() {
+	auto node = parent_;
+	while (node->parent_)
+		node = node->parent_;
+	return static_cast<Scope *>(node);
+}
+
 Value StmExpr::eval() {
 	return expr_->eval();
 }
@@ -93,18 +100,21 @@ Value ExprId::eval() {
 }
 
 Value Func::operator () (ExprList *ops) {
-	auto prev_vars = body_->getVars();
 	if (ops->size() != decls_->size())
 		throw std::logic_error("incorrect number of arguments in application");
+	auto prev_vars = body_->getVars();
+	
 	auto it = decls_->begin();
 	for (auto expr : *ops)
 		body_->assign(*it++, expr->eval());
+	
 	Value res;
 	try {
 		res = body_->eval();
 	} catch (ReturnExcept &ret) {
 		res = ret.val_;
 	}
+	
 	body_->setVars(prev_vars);
 	return res;
 }
@@ -112,10 +122,7 @@ Value Func::operator () (ExprList *ops) {
 Value ExprFunc::eval() {
 	auto val = Value(this);
 	if (id_) {
-		auto node = parent_;
-		while (node->parent_)
-			node = node->parent_;
-		static_cast<Scope *>(node)->assign(id_->name_, val);
+		getGlobalScope()->assign(id_->name_, val);
 		delete id_;
 		id_ = nullptr;
 	}

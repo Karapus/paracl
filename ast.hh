@@ -15,20 +15,17 @@
 namespace AST {
 
 struct Func;
+struct ExprFunc;
+struct Value;
+struct Scope;
+struct DeclList;
+struct ExprList;
 
 struct IValue {
 	virtual operator int&() = 0;
 	virtual operator Func&() = 0;
 	virtual IValue *clone() const = 0;
 	virtual ~IValue() = default;
-};
-
-
-struct Scope;
-struct Node {
-	Node *parent_ = nullptr;
-	virtual ~Node() = default;
-
 };
 
 struct IntValue : public IValue {
@@ -48,11 +45,6 @@ public:
 	{}
 };
 
-struct ExprFunc;
-struct DeclList;
-struct ExprList;
-struct Value;
-
 struct Func {
 	Scope *body_;
 	DeclList *decls_;
@@ -61,9 +53,9 @@ struct Func {
 };
 
 struct FuncValue : public IValue {
-	private:
+private:
 	Func func_;
-	public:
+public:
 	operator int&() override {
 		throw std::logic_error("Func as Int");
 	}
@@ -90,9 +82,9 @@ struct DefaultValue : public IValue {
 };
 
 struct Value {
-	private:
+private:
 	IValue *ptr_;
-	public:
+public:
 	Value() : ptr_(new DefaultValue{}) {
 	}
 	Value(const Value &rhs) {
@@ -125,10 +117,17 @@ struct Value {
 
 using VarsT = std::map<std::string, Value>;
 
-struct Expr : public Node, public IExecable{
+struct Node {
+	Node *parent_ = nullptr;
+	virtual ~Node() = default;
+
+};
+
+struct Expr : public Node, public IExecable {
 	virtual Value eval() = 0;
 	void exec() override;
 	Scope *getScope();
+	Scope *getGlobalScope();
 };
 
 struct BinOp : public Node, public INode {
@@ -153,9 +152,9 @@ struct UnOp : public Node, public INode {
 };
 
 struct BlockList : public Expr {
-	private:
+private:
 	std::vector<Expr *> cner_;
-	public:
+public:
 	~BlockList() {
 		for (auto expr : cner_)
 			delete expr;
@@ -168,9 +167,9 @@ struct BlockList : public Expr {
 };
 
 struct DeclList : public INode {
-	private:
+private:
 	std::vector<std::string> cner_;
-	public:
+public:
 	auto begin() {
 		return cner_.begin();
 	}
@@ -186,9 +185,9 @@ struct DeclList : public INode {
 };
 
 struct ExprList : public INode {
-	private:
+private:
 	std::vector<Expr *> cner_;
-	public:
+public:
 	~ExprList() {
 		for (auto expr : cner_)
 			delete expr;
@@ -208,10 +207,10 @@ struct ExprList : public INode {
 };
 
 struct Scope : public Expr {
-	private:
+private:
 	VarsT vars_;
 	BlockList *blocks;
-	public:
+public:
 	Scope(BlockList *b) : blocks(b) {
 		blocks->parent_ = this;
 	}
