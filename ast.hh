@@ -48,7 +48,8 @@ public:
 struct Func {
 	Scope *body_;
 	DeclList *decls_;
-	Func(ExprFunc *func);
+	Func(Scope *body, DeclList *decls_) : body_(body), decls_(decls_) {
+	}
 	Value operator () (ExprList *ops);
 };
 
@@ -225,7 +226,7 @@ public:
 	}
 	Value eval() override; 
 	void assign(const std::string &name, Value new_val);
-	bool insert(const std::string &name, Value new_val);
+	bool assignIfPresent(const std::string &name, Value new_val);
 	std::optional<Value> resolve(const std::string &name) const;
 };
 
@@ -309,15 +310,16 @@ struct ExprId : public Expr {
 };
 
 struct ExprFunc : public Expr {
-	Scope *body_;
-	DeclList *decls_;
-	ExprId *id_;
+private:
+	std::unique_ptr<Scope> body_;
+	std::unique_ptr<DeclList> decls_;
+	std::unique_ptr<ExprId> id_;
+public:
 	ExprFunc(Scope *b, DeclList *d, ExprId *i = nullptr) : body_(b), decls_(d), id_(i) {
 		body_->parent_ = this;
 	}
-	~ExprFunc() {
-		delete body_;
-		delete decls_;
+	operator Func() {
+		return Func{body_.get(), decls_.get()};
 	}
 	Value eval() override;
 };

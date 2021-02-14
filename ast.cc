@@ -2,8 +2,6 @@
 
 namespace AST {
 
-struct Func;
-
 void Expr::exec() {
 	Value res;
 	try {
@@ -30,11 +28,16 @@ Value Scope::eval() {
 }
 
 void Scope::assign(const std::string &name, Value new_val) {
-	vars_.insert_or_assign(name, new_val);
+	vars_[name] = new_val;
 }
 
-bool Scope::insert(const std::string &name, Value new_val) {
-	return vars_.insert(std::make_pair(name, new_val)).second;
+bool Scope::assignIfPresent(const std::string &name, Value new_val) {
+	auto it = vars_.find(name);
+	if (it != vars_.end()) {
+		it->second = new_val;
+		return true;
+	}
+	return false;
 }
 
 std::optional<Value> Scope::resolve(const std::string &name) const {
@@ -120,11 +123,10 @@ Value Func::operator () (ExprList *ops) {
 }
 
 Value ExprFunc::eval() {
-	auto val = Value(this);
+	Func val = *this;
 	if (id_) {
 		getGlobalScope()->assign(id_->name_, val);
-		delete id_;
-		id_ = nullptr;
+		id_.reset();
 	}
 	return val;
 }
@@ -139,7 +141,7 @@ Value ExprAssign::eval() {
 	Value val = expr_->eval();
 	const auto &name = id_->name_;
 	bool flag;
-	for (auto scope = getScope(); scope && (flag = !scope->insert(name, val)); scope = scope->getScope())
+	for (auto scope = getScope(); scope && (flag = !scope->assignIfPresent(name, val)); scope = scope->getScope())
 		;
 	if (flag)
 		getScope()->assign(name, val);
@@ -157,7 +159,4 @@ Value ExprBinOp::eval() {
 Value ExprUnOp::eval() {
 	return (*op_)(rhs_.get());
 }
-
-Func::Func(ExprFunc *func) : body_(func->body_), decls_(func->decls_) 
-{}
 }
