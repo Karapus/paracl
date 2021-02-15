@@ -1,0 +1,4 @@
+foo = func (x, y, z) { print x; print y; print z; }
+bar = func () { print 0; }
+bar();
+foo(1, 2, 3);

@@ -1,0 +1,2 @@
+print foo();
+foo = func() { 0; }

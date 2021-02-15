@@ -14,7 +14,7 @@
 %define api.value.type {AST::INode *}
 %parse-param { Driver &driver }
 %code {
-	#include "driver.h"
+	#include "driver.hh"
 	#undef	yylex
 	#define	yylex driver.lexer.yylex
 }

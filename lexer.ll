@@ -2,7 +2,7 @@
 %option noyywrap nodefault
 %{
 	#include "grammar.tab.hh"
-	#include "lexer.h"
+	#include "lexer.hh"
 	#include <string>
 	#define YY_USER_ACTION yyloc->columns(YYLeng());
 	#define YY_TERMINATE return 

@@ -1,0 +1,3 @@
+foo = func () { 3; }
+print foo() / 3;
+print foo / 3;
