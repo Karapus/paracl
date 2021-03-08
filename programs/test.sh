@@ -21,4 +21,4 @@ do
 		echo -e "${red} $(diff .log $name.ans) ${nc}"
 	fi
 done
-rm ".log"
+rm -f ".log"

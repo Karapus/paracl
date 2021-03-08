@@ -1,11 +1,12 @@
 #include "ast.hh"
+#include <utility>
 
 namespace AST {
 
 void Expr::exec() {
-	Value res;
+	Context ctxt;
 	try {
-		res = eval();
+		eval(ctxt);
 	} catch (std::logic_error& err) {
 		std::cout << "Semantic error: " << err.what() << std::endl;
 	} catch (ReturnExcept&) {
@@ -13,20 +14,21 @@ void Expr::exec() {
 	}
 }
 
-Value BlockList::eval() {
-	Value res;
-	for (auto expr : cner_) {
-		res = expr->eval();
+void BlockList::eval(Context &ctxt) {
+	for (auto &&expr : cner_)
+		expr->eval(ctxt);
+}
+
+void Scope::eval(Context &ctxt) {
+	if (blocks) {
+		ctxt.scope_stack.emplace_back();
+		blocks->eval(ctxt);
+		ctxt.scope_stack.pop_back();
 	}
-	return res;
+	else
+		ctxt.ret = Value{};
 }
-
-Value Scope::eval() {
-	if (blocks)
-		return blocks->eval();
-	return Value{};
-}
-
+#if 0
 void Scope::assign(const std::string &name, Value new_val) {
 	vars_[name] = new_val;
 }
@@ -58,105 +60,108 @@ Scope *Expr::getGlobalScope() {
 		node = node->parent_;
 	return static_cast<Scope *>(node);
 }
-
-Value StmExpr::eval() {
-	return expr_->eval();
+#endif
+void StmExpr::eval(Context &ctxt) {
+	expr_->eval(ctxt);
 }
 
-Value StmPrint::eval() {
-	auto val = expr_->eval();
-	std::cout << static_cast<int>(val) << std::endl;
-	return val;
+void StmPrint::eval(Context &ctxt) {
+	expr_->eval(ctxt);
+	std::cout << static_cast<int>(ctxt.ret) << std::endl;
 }
 
-Value StmWhile::eval() {
-	Value res;
-	while (expr_->eval()) {
-		res = block_->eval();
+void StmWhile::eval(Context &ctxt) {
+	auto res = Value{};
+	while (expr_->eval(ctxt), ctxt.ret) {
+		block_->eval(ctxt);
+		res = ctxt.ret;
 	}
-	return res;
+	ctxt.ret = res;
 }
 
-Value StmIf::eval() {
-	if (expr_->eval())
-		return true_block_->eval();
-	if (false_block_)
-		return false_block_->eval();
-	return Value{};
+void StmIf::eval(Context &ctxt) {
+	if (expr_->eval(ctxt), ctxt.ret)
+		true_block_->eval(ctxt);
+	else if (false_block_)
+		false_block_->eval(ctxt);
+	else
+		ctxt.ret = Value{};
 }
 
-Value StmReturn::eval() {
-	throw ReturnExcept(expr_->eval());
+void StmReturn::eval(Context &ctxt) {
+	expr_->eval(ctxt);
+	throw ReturnExcept{};
 }
 
-Value ExprInt::eval() {
-	return Value{val_};
+void ExprInt::eval(Context &ctxt) {
+	ctxt.ret = Value{val_};
 }
 
-Value ExprId::eval() {
-	for (auto scope = getScope(); scope; scope = scope->getScope()) {
-		auto val = scope->resolve(name_);
-		if (val)
-			return *val;
+void ExprId::eval(Context &ctxt) {
+	for (auto it = ctxt.scope_stack.rbegin(), end = ctxt.scope_stack.rend(); it != end; ++it) {
+		auto var = it->find(name_);
+		if (var != it->end())
+			return (void) (ctxt.ret = var->second);
 	}
-	return Value();
+	ctxt.ret  = Value{};
 }
 
-Value Func::operator () (ExprList *ops) {
+void Func::apply(Context &ctxt, ExprList *ops) {
 	if (ops->size() != decls_->size())
 		throw std::logic_error("incorrect number of arguments in application");
-	auto prev_vars = body_->getVars();
-	
+	ctxt.scope_stack.emplace_back();
 	auto it = decls_->begin();
-	for (auto expr : *ops)
-		body_->assign(*it++, expr->eval());
-	
-	Value res;
+	for (auto &&expr : *ops) {
+		expr->eval(ctxt);
+		ctxt.scope_stack.back().emplace(*it++, ctxt.ret);
+	}
 	try {
-		res = body_->eval();
-	} catch (ReturnExcept &ret) {
-		res = ret.val_;
+		body_->eval(ctxt);
+	} catch (ReturnExcept &) {
 	}
-	
-	body_->setVars(prev_vars);
-	return res;
+	ctxt.scope_stack.pop_back();
 }
 
-Value ExprFunc::eval() {
-	Func val = *this;
-	if (id_) {
-		getGlobalScope()->assign(id_->name_, val);
-		id_.reset();
-	}
-	return val;
+void ExprFunc::eval(Context &ctxt) {
+	ctxt.ret = Func{*this};
+	if (id_)
+		ctxt.scope_stack.front()[id_->name_] = ctxt.ret;
 }
 
-Value ExprQmark::eval() {
+void ExprQmark::eval(Context &ctxt) {
 	int val;
 	std::cin >> val;
-	return Value{val};
+	ctxt.ret = Value{val};
 }
 
-Value ExprAssign::eval() {
-	Value val = expr_->eval();
-	const auto &name = id_->name_;
-	bool flag;
-	for (auto scope = getScope(); scope && (flag = !scope->assignIfPresent(name, val)); scope = scope->getScope())
-		;
-	if (flag)
-		getScope()->assign(name, val);
-	return  val;
+void ExprAssign::eval(Context &ctxt) {
+	expr_->eval(ctxt);
+	auto &&name = id_->name_;
+	auto pred  = [&](auto &&vars) mutable {
+		if (vars.find(name) != vars.end()) {
+			vars[name] = ctxt.ret;
+			return false;
+		}
+		return true;
+	};
+	if (std::all_of(ctxt.scope_stack.rbegin(), ctxt.scope_stack.rend(), pred))
+		ctxt.scope_stack.back()[name] = ctxt.ret;
 }
 
-Value ExprApply::eval() {
-	return static_cast<Func>(id_->eval())(ops_.get());
+void ExprApply::eval(Context &ctxt) {
+	id_->eval(ctxt);
+	static_cast<Func>(ctxt.ret).apply(ctxt, ops_.get());
 }
 
-Value ExprBinOp::eval() {
-	return (*op_)(lhs_.get(), rhs_.get());
+void ExprBinOp::eval(Context &ctxt) {
+	auto l = (lhs_->eval(ctxt), ctxt.ret);
+	auto r = (rhs_->eval(ctxt), ctxt.ret);
+	ctxt.ret = (*op_)(l, r);
 }
 
-Value ExprUnOp::eval() {
-	return (*op_)(rhs_.get());
+void ExprUnOp::eval(Context &ctxt) {
+	ctxt.ret = (*op_)(
+		(rhs_->eval(ctxt), ctxt.ret)
+		);
 }
 }
