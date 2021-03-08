@@ -7,8 +7,6 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include <typeinfo>
-#include <optional>
 #include <functional>
 #include <memory>
 
@@ -140,12 +138,6 @@ public:
 };
 
 using VarsT = std::unordered_map<std::string, Value>;
-
-struct Context {
-	std::vector<VarsT> scope_stack;
-	//std::vector<Callback> call_stack;
-	Value ret;
-};
 
 struct Node {
 	Node *parent_ = nullptr;
@@ -288,9 +280,6 @@ public:
 			false_block_->parent_ = this;
 	}
 	void eval(Context &ctxt) override;
-};
-
-struct ReturnExcept {
 };
 
 struct StmReturn : public Expr {

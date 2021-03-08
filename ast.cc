@@ -1,7 +1,15 @@
 #include "ast.hh"
+#include <csetjmp>
 #include <utility>
 
 namespace AST {
+
+struct Context {
+	std::vector<VarsT> scope_stack;
+	std::jmp_buf ret_buf;
+	Value ret;
+};
+
 
 void Expr::exec() {
 	Context ctxt;
@@ -9,9 +17,8 @@ void Expr::exec() {
 		eval(ctxt);
 	} catch (std::logic_error& err) {
 		std::cout << "Semantic error: " << err.what() << std::endl;
-	} catch (ReturnExcept&) {
-		std::cout << "Return outside of function" << std::endl;
 	}
+	//uncatched return;
 }
 
 void BlockList::eval(Context &ctxt) {
@@ -90,7 +97,7 @@ void StmIf::eval(Context &ctxt) {
 
 void StmReturn::eval(Context &ctxt) {
 	expr_->eval(ctxt);
-	throw ReturnExcept{};
+	std::longjmp(ctxt.ret_buf, 1);
 }
 
 void ExprInt::eval(Context &ctxt) {
@@ -115,10 +122,8 @@ void Func::apply(Context &ctxt, ExprList *ops) {
 		expr->eval(ctxt);
 		ctxt.scope_stack.back().emplace(*it++, ctxt.ret);
 	}
-	try {
+	if (!setjmp(ctxt.ret_buf))
 		body_->eval(ctxt);
-	} catch (ReturnExcept &) {
-	}
 	ctxt.scope_stack.pop_back();
 }
 
