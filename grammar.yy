@@ -81,7 +81,7 @@ block	: stm			{ $$ = $1; }
         | error			{ $$ = AST::makeScope(AST::makeBlockListTerm());   }
 ;
 
-stm	: SEMICOLON					{ $$ = AST::makeBlockListTerm();	}
+stm	: SEMICOLON					{ $$ = AST::makeScope(AST::makeBlockListTerm());	}
 	| expr SEMICOLON				{ $$ = AST::makeStmExpr($1);		}
 	| PRINT expr SEMICOLON				{ $$ = AST::makeStmPrint($2);		}
 	| WHILE LPAR expr RPAR block			{ $$ = AST::makeStmWhile($3, $5);	}

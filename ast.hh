@@ -139,8 +139,10 @@ public:
 
 using VarsT = std::unordered_map<std::string, Value>;
 
+struct Expr;
+
 struct Node {
-	Node *parent_ = nullptr;
+	Expr *parent_ = nullptr;
 	virtual ~Node() = default;
 };
 
@@ -167,15 +169,13 @@ struct UnOp : public Node, public INode {
 
 struct BlockList : public Expr {
 private:
-	std::vector<Expr *> cner_;
+	std::unique_ptr<BlockList> blocks_;
+	std::unique_ptr<Expr> block_;
 public:
-	~BlockList() {
-		for (auto expr : cner_)
-			delete expr;
-	}
-	void push_back(Expr *expr) {
-		cner_.push_back(expr);
-		expr->parent_ = this;
+	BlockList(BlockList *blocks, Expr *block) : blocks_(blocks), block_(block) {
+		block_->parent_ = this;
+		if (blocks_)
+			blocks_->parent_ = this;
 	}
 	const Expr *eval(Context &ctxt) const override;
 };
@@ -225,7 +225,8 @@ private:
 	BlockList *blocks;
 public:
 	Scope(BlockList *b) : blocks(b) {
-		blocks->parent_ = this;
+		if (blocks)
+			blocks->parent_ = this;
 	}
 	~Scope() {
 		delete blocks;
@@ -249,8 +250,7 @@ private:
 	std::unique_ptr<Expr> block_;
 public:
 	StmWhile(Expr *e, Expr *b) : expr_(e), block_(b) {
-		expr_->parent_ = this;
-		block_->parent_ = this;
+		expr_->parent_ = block_->parent_ = this;
 	}
 	const Expr *eval(Context &ctxt) const override;
 };

@@ -35,14 +35,16 @@ void Expr::exec() {
 }
 
 const Expr *BlockList::eval(Context &ctxt) const {
-	Value result;
-	for (auto &&expr : cner_) {
-		ctxt(expr);
-		result = ctxt.res.back();
-		ctxt.res.pop_back();
+	if (ctxt.prev == parent_) {
+		if (blocks_)
+			return blocks_.get();
+		return block_.get();
 	}
-	ctxt.res.push_back(result);
-	return static_cast<const Expr *>(parent_);
+	if (ctxt.prev == blocks_.get()) {
+		ctxt.res.pop_back();
+		return block_.get();
+	}
+	return parent_;
 }
 
 const Expr *Scope::eval(Context &ctxt) const {
@@ -52,11 +54,11 @@ const Expr *Scope::eval(Context &ctxt) const {
 			return blocks;
 		}
 		ctxt.scope_stack.pop_back();
-		return static_cast<const Expr *>(parent_);
+		return parent_;
 	} else {
 		if (ctxt.prev == parent_)
 			ctxt.res.emplace_back();
-		return static_cast<const Expr *>(parent_);
+		return parent_;
 	}
 }
 
@@ -64,7 +66,7 @@ const Expr *StmPrint::eval(Context &ctxt) const {
 	if (ctxt.prev == parent_)
 		return expr_.get();
 	std::cout << static_cast<int>(ctxt.res.back()) << std::endl;
-	return static_cast<const Expr *>(parent_);
+	return parent_;
 }
 
 const Expr *StmWhile::eval(Context &ctxt) const {
@@ -81,7 +83,7 @@ const Expr *StmWhile::eval(Context &ctxt) const {
 		ctxt.res.pop_back();
 		return block_.get();
 	}
-	return static_cast<const Expr *>(parent_);
+	return parent_;
 }
 
 const Expr *StmIf::eval(Context &ctxt) const {
@@ -96,7 +98,7 @@ const Expr *StmIf::eval(Context &ctxt) const {
 			return false_block_.get();
 		ctxt.res.emplace_back();
 	}
-	return static_cast<const Expr *>(parent_);
+	return parent_;
 }
 
 const Expr *StmReturn::eval(Context &ctxt) const {
@@ -109,18 +111,18 @@ const Expr *StmReturn::eval(Context &ctxt) const {
 
 const Expr *ExprInt::eval(Context &ctxt) const {
 	ctxt.res.emplace_back(val_);
-	return static_cast<const Expr *>(parent_);
+	return parent_;
 }
 const Expr *ExprId::eval(Context &ctxt) const {
 	for (auto it = ctxt.scope_stack.rbegin(), end = ctxt.scope_stack.rend(); it != end; ++it) {
 		auto var = it->find(name_);
 		if (var != it->end()) {
 			ctxt.res.push_back(var->second);
-			return static_cast<const Expr *>(parent_);
+			return parent_;
 		}
 	}
 	ctxt.res.emplace_back();
-	return static_cast<const Expr *>(parent_);
+	return parent_;
 }
 
 void Func::apply(Context &ctxt, ExprList *ops) {
@@ -152,7 +154,7 @@ const Expr *ExprQmark::eval(Context &ctxt) const {
 	int val;
 	std::cin >> val;
 	ctxt.res.emplace_back(val);
-	return static_cast<const Expr *>(parent_);
+	return parent_;
 }
 const Expr *ExprAssign::eval(Context &ctxt) const {
 	if (ctxt.prev == parent_)
@@ -168,7 +170,7 @@ const Expr *ExprAssign::eval(Context &ctxt) const {
 	};
 	if (std::all_of(ctxt.scope_stack.rbegin(), ctxt.scope_stack.rend(), pred))
 		ctxt.scope_stack.back()[name] = std::move(val);
-	return static_cast<const Expr *>(parent_);
+	return parent_;
 }
 
 const Expr *ExprApply::eval(Context &ctxt) const {
@@ -189,7 +191,7 @@ const Expr *ExprBinOp::eval(Context &ctxt) const {
 	auto l = std::move(ctxt.res.back());
 	ctxt.res.pop_back();
 	ctxt.res.emplace_back((*op_)(l, r));
-	return static_cast<const Expr *>(parent_);
+	return parent_;
 }
 
 const Expr *ExprUnOp::eval(Context &ctxt) const {
@@ -198,6 +200,6 @@ const Expr *ExprUnOp::eval(Context &ctxt) const {
 	auto r = ctxt.res.back();
 	ctxt.res.pop_back();
 	ctxt.res.emplace_back((*op_)(r));
-	return static_cast<const Expr *>(parent_);
+	return parent_;
 }
 }
