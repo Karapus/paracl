@@ -20,7 +20,7 @@ INode *AST::makeBlockListTerm() {
 	return new BlockList{};
 }
 INode *AST::makeStmExpr(INode *expr) {
-	return new StmExpr{static_cast<Expr *>(expr)};
+	return expr;
 }
 INode *AST::makeStmPrint(INode *expr) {
 	return new StmPrint{static_cast<Expr *>(expr)};

@@ -145,10 +145,8 @@ struct Node {
 };
 
 struct Expr : public Node, public IExecable {
-	virtual void eval(Context &ctxt) = 0;
+	virtual const Expr *eval(Context &ctxt) const = 0;
 	void exec() override;
-	Scope *getScope();
-	Scope *getGlobalScope();
 };
 
 struct BinOp : public Node, public INode {
@@ -179,7 +177,7 @@ public:
 		cner_.push_back(expr);
 		expr->parent_ = this;
 	}
-	void eval(Context &ctxt) override;
+	const Expr *eval(Context &ctxt) const override;
 };
 
 struct DeclList : public INode {
@@ -232,17 +230,7 @@ public:
 	~Scope() {
 		delete blocks;
 	}
-	void eval(Context &ctxt) override; 
-};
-
-struct StmExpr : public Expr {
-private:
-	std::unique_ptr<Expr> expr_;
-public:
-	StmExpr(Expr *e) : expr_(e) {
-		expr_->parent_ = this;
-	}
-	void eval(Context &ctxt) override;
+	const Expr *eval(Context &ctxt) const override; 
 };
 
 struct StmPrint : public Expr {
@@ -252,7 +240,7 @@ public:
 	StmPrint(Expr *e) : expr_(e) {
 		expr_->parent_ = this;
 	}
-	void eval(Context &ctxt) override;
+	const Expr *eval(Context &ctxt) const override;
 };
 
 struct StmWhile : public Expr {
@@ -264,7 +252,7 @@ public:
 		expr_->parent_ = this;
 		block_->parent_ = this;
 	}
-	void eval(Context &ctxt) override;
+	const Expr *eval(Context &ctxt) const override;
 };
 
 struct StmIf : public Expr {
@@ -279,7 +267,7 @@ public:
 		if (false_block_)
 			false_block_->parent_ = this;
 	}
-	void eval(Context &ctxt) override;
+	const Expr *eval(Context &ctxt) const override;
 };
 
 struct StmReturn : public Expr {
@@ -289,7 +277,7 @@ public:
 	StmReturn(Expr *expr) : expr_(expr) {
 		expr_->parent_ = this;
 	}
-	void eval(Context &ctxt) override;
+	const Expr *eval(Context &ctxt) const override;
 };
 
 struct ExprInt : public Expr {
@@ -298,14 +286,14 @@ private:
 public:
 	ExprInt(int i) : val_(i)
 	{}
-	void eval(Context &ctxt) override;
+	const Expr *eval(Context &ctxt) const override;
 };
 
 struct ExprId : public Expr {
 	std::string name_;
 	ExprId(std::string n) : name_(n)
 	{}
-	void eval(Context &ctxt) override;
+	const Expr *eval(Context &ctxt) const override;
 };
 
 struct ExprFunc : public Expr {
@@ -320,11 +308,11 @@ public:
 	operator Func() {
 		return Func{body_.get(), decls_.get()};
 	}
-	void eval(Context &ctxt) override;
+	const Expr *eval(Context &ctxt) const override;
 };
 
 struct ExprQmark : public Expr {
-	void eval(Context &ctxt) override;
+	const Expr *eval(Context &ctxt) const override;
 };
 struct ExprAssign : public Expr {
 private:
@@ -335,7 +323,7 @@ public:
 		id_->parent_ = this;
 		expr_->parent_ = this;
 	}
-	void eval(Context &ctxt) override;
+	const Expr *eval(Context &ctxt) const override;
 };
 
 struct ExprApply : public Expr {
@@ -348,7 +336,7 @@ public:
 		for (auto expr : *ops_)
 			expr->parent_ = this;
 	}
-	void eval(Context &ctxt) override;
+	const Expr *eval(Context &ctxt) const override;
 };
 
 struct ExprBinOp : public Expr {
@@ -362,7 +350,7 @@ public:
 		lhs_->parent_ = this;
 		rhs_->parent_ = this;
 	}
-	void eval(Context &ctxt) override;
+	const Expr *eval(Context &ctxt) const override;
 };
 
 struct ExprUnOp : public Expr {
@@ -374,7 +362,7 @@ public:
 		op_->parent_ = this;
 		rhs_->parent_ = this;
 	}
-	void eval(Context &ctxt) override;
+	const Expr *eval(Context &ctxt) const override;
 };
 
 struct BinOpMul : public BinOp {

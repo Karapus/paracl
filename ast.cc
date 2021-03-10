@@ -1,119 +1,130 @@
 #include "ast.hh"
 #include <csetjmp>
 #include <utility>
+#include <cassert>
+#include <iostream>
 
 namespace AST {
 
 struct Context {
 	std::vector<VarsT> scope_stack;
-	std::jmp_buf ret_buf;
-	Value ret;
+	const Expr *prev;
+	std::vector<Value> res;
+	void operator() (const Expr *expr);
 };
 
+void Context::operator() (const Expr *expr) {
+	auto root_par = static_cast<const Expr *>(expr->parent_);
+	prev = root_par;
+	while (expr != root_par) {
+		auto tmp = expr->eval(*this);
+		prev = expr;
+		expr = tmp;
+	}
+	assert(res.size() == 1);
+}
 
 void Expr::exec() {
 	Context ctxt;
 	try {
-		eval(ctxt);
+		ctxt(this);
 	} catch (std::logic_error& err) {
 		std::cout << "Semantic error: " << err.what() << std::endl;
 	}
 	//uncatched return;
 }
 
-void BlockList::eval(Context &ctxt) {
-	for (auto &&expr : cner_)
-		expr->eval(ctxt);
+const Expr *BlockList::eval(Context &ctxt) const {
+	Value result;
+	for (auto &&expr : cner_) {
+		ctxt(expr);
+		result = ctxt.res.back();
+		ctxt.res.pop_back();
+	}
+	ctxt.res.push_back(result);
+	return static_cast<const Expr *>(parent_);
 }
 
-void Scope::eval(Context &ctxt) {
+const Expr *Scope::eval(Context &ctxt) const {
 	if (blocks) {
-		ctxt.scope_stack.emplace_back();
-		blocks->eval(ctxt);
+		if (ctxt.prev == parent_) {
+			ctxt.scope_stack.emplace_back();
+			return blocks;
+		}
 		ctxt.scope_stack.pop_back();
+		return static_cast<const Expr *>(parent_);
+	} else {
+		if (ctxt.prev == parent_)
+			ctxt.res.emplace_back();
+		return static_cast<const Expr *>(parent_);
 	}
-	else
-		ctxt.ret = Value{};
 }
+
+const Expr *StmPrint::eval(Context &ctxt) const {
+	if (ctxt.prev == parent_)
+		return expr_.get();
+	std::cout << static_cast<int>(ctxt.res.back()) << std::endl;
+	return static_cast<const Expr *>(parent_);
+}
+
+const Expr *StmWhile::eval(Context &ctxt) const {
+	if (ctxt.prev == parent_) {
+		ctxt.res.emplace_back();
+		return expr_.get();
+	}
+	if (ctxt.prev == block_.get()) {
+		return expr_.get();
+	}
+	bool flag = ctxt.res.back();
+	ctxt.res.pop_back();
+	if (flag && block_.get()) {
+		ctxt.res.pop_back();
+		return block_.get();
+	}
+	return static_cast<const Expr *>(parent_);
+}
+
+const Expr *StmIf::eval(Context &ctxt) const {
+	if (ctxt.prev == parent_)
+		return expr_.get();
+	if (ctxt.prev == expr_.get()) {
+		bool is_true = ctxt.res.back();
+		ctxt.res.pop_back();
+		if (is_true)
+			return true_block_.get();
+		if (false_block_)
+			return false_block_.get();
+		ctxt.res.emplace_back();
+	}
+	return static_cast<const Expr *>(parent_);
+}
+
+const Expr *StmReturn::eval(Context &ctxt) const {
 #if 0
-void Scope::assign(const std::string &name, Value new_val) {
-	vars_[name] = new_val;
-}
-
-bool Scope::assignIfPresent(const std::string &name, Value new_val) {
-	auto it = vars_.find(name);
-	if (it != vars_.end()) {
-		it->second = new_val;
-		return true;
-	}
-	return false;
-}
-
-std::optional<Value> Scope::resolve(const std::string &name) const {
-	auto it = vars_.find(name);
-	return it != vars_.cend() ? std::make_optional(it->second) : std::optional<Value>();
-}
-
-Scope *Expr::getScope() {
-	auto node = parent_;
-	while (node && (typeid(*node) != typeid(Scope)))
-		node = node->parent_;
-	return static_cast<Scope *>(node);
-}
-
-Scope *Expr::getGlobalScope() {
-	auto node = parent_;
-	while (node->parent_)
-		node = node->parent_;
-	return static_cast<Scope *>(node);
-}
-#endif
-void StmExpr::eval(Context &ctxt) {
-	expr_->eval(ctxt);
-}
-
-void StmPrint::eval(Context &ctxt) {
-	expr_->eval(ctxt);
-	std::cout << static_cast<int>(ctxt.ret) << std::endl;
-}
-
-void StmWhile::eval(Context &ctxt) {
-	auto res = Value{};
-	while (expr_->eval(ctxt), ctxt.ret) {
-		block_->eval(ctxt);
-		res = ctxt.ret;
-	}
-	ctxt.ret = res;
-}
-
-void StmIf::eval(Context &ctxt) {
-	if (expr_->eval(ctxt), ctxt.ret)
-		true_block_->eval(ctxt);
-	else if (false_block_)
-		false_block_->eval(ctxt);
-	else
-		ctxt.ret = Value{};
-}
-
-void StmReturn::eval(Context &ctxt) {
 	expr_->eval(ctxt);
 	std::longjmp(ctxt.ret_buf, 1);
+#endif
+	return nullptr;
 }
 
-void ExprInt::eval(Context &ctxt) {
-	ctxt.ret = Value{val_};
+const Expr *ExprInt::eval(Context &ctxt) const {
+	ctxt.res.emplace_back(val_);
+	return static_cast<const Expr *>(parent_);
 }
-
-void ExprId::eval(Context &ctxt) {
+const Expr *ExprId::eval(Context &ctxt) const {
 	for (auto it = ctxt.scope_stack.rbegin(), end = ctxt.scope_stack.rend(); it != end; ++it) {
 		auto var = it->find(name_);
-		if (var != it->end())
-			return (void) (ctxt.ret = var->second);
+		if (var != it->end()) {
+			ctxt.res.push_back(var->second);
+			return static_cast<const Expr *>(parent_);
+		}
 	}
-	ctxt.ret  = Value{};
+	ctxt.res.emplace_back();
+	return static_cast<const Expr *>(parent_);
 }
 
 void Func::apply(Context &ctxt, ExprList *ops) {
+#if 0
 	if (ops->size() != decls_->size())
 		throw std::logic_error("incorrect number of arguments in application");
 	ctxt.scope_stack.emplace_back();
@@ -125,48 +136,68 @@ void Func::apply(Context &ctxt, ExprList *ops) {
 	if (!setjmp(ctxt.ret_buf))
 		body_->eval(ctxt);
 	ctxt.scope_stack.pop_back();
+#endif
 }
 
-void ExprFunc::eval(Context &ctxt) {
+const Expr *ExprFunc::eval(Context &ctxt) const {
+#if 0
 	ctxt.ret = Func{*this};
 	if (id_)
 		ctxt.scope_stack.front()[id_->name_] = ctxt.ret;
+#endif
+	return nullptr;
 }
 
-void ExprQmark::eval(Context &ctxt) {
+const Expr *ExprQmark::eval(Context &ctxt) const {
 	int val;
 	std::cin >> val;
-	ctxt.ret = Value{val};
+	ctxt.res.emplace_back(val);
+	return static_cast<const Expr *>(parent_);
 }
-
-void ExprAssign::eval(Context &ctxt) {
-	expr_->eval(ctxt);
+const Expr *ExprAssign::eval(Context &ctxt) const {
+	if (ctxt.prev == parent_)
+		return expr_.get();
 	auto &&name = id_->name_;
-	auto pred  = [&](auto &&vars) mutable {
+	auto val = ctxt.res.back();
+	auto pred  = [val, name](auto &&vars) mutable {
 		if (vars.find(name) != vars.end()) {
-			vars[name] = ctxt.ret;
+			vars[name] = std::move(val);
 			return false;
 		}
 		return true;
 	};
 	if (std::all_of(ctxt.scope_stack.rbegin(), ctxt.scope_stack.rend(), pred))
-		ctxt.scope_stack.back()[name] = ctxt.ret;
+		ctxt.scope_stack.back()[name] = std::move(val);
+	return static_cast<const Expr *>(parent_);
 }
 
-void ExprApply::eval(Context &ctxt) {
+const Expr *ExprApply::eval(Context &ctxt) const {
+#if 0
 	id_->eval(ctxt);
 	static_cast<Func>(ctxt.ret).apply(ctxt, ops_.get());
+#endif
+	return nullptr;
 }
 
-void ExprBinOp::eval(Context &ctxt) {
-	auto l = (lhs_->eval(ctxt), ctxt.ret);
-	auto r = (rhs_->eval(ctxt), ctxt.ret);
-	ctxt.ret = (*op_)(l, r);
+const Expr *ExprBinOp::eval(Context &ctxt) const {
+	if (ctxt.prev == parent_)
+		return lhs_.get();
+	if (ctxt.prev == lhs_.get())
+		return rhs_.get();
+	auto r = std::move(ctxt.res.back());
+	ctxt.res.pop_back();
+	auto l = std::move(ctxt.res.back());
+	ctxt.res.pop_back();
+	ctxt.res.emplace_back((*op_)(l, r));
+	return static_cast<const Expr *>(parent_);
 }
 
-void ExprUnOp::eval(Context &ctxt) {
-	ctxt.ret = (*op_)(
-		(rhs_->eval(ctxt), ctxt.ret)
-		);
+const Expr *ExprUnOp::eval(Context &ctxt) const {
+	if (ctxt.prev == parent_)
+		return rhs_.get();
+	auto r = ctxt.res.back();
+	ctxt.res.pop_back();
+	ctxt.res.emplace_back((*op_)(r));
+	return static_cast<const Expr *>(parent_);
 }
 }
