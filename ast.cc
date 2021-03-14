@@ -1,5 +1,4 @@
 #include "ast.hh"
-#include <csetjmp>
 #include <utility>
 #include <cassert>
 #include <iostream>
@@ -7,8 +6,9 @@
 namespace AST {
 
 struct Context {
-	std::vector<VarsT> scope_stack;
-	std::vector<const ExprApply *> call_stack;
+	using ScopeStackT = std::vector<VarsT>;
+	ScopeStackT scope_stack;
+	std::vector<std::pair<const ExprApply *, ScopeStackT>> call_stack;
 	const Expr *prev;
 	std::vector<Value> res;
 	void operator() (const Expr *expr);
@@ -137,7 +137,7 @@ const Expr *StmReturn::eval(Context &ctxt) const {
 		ctxt.res.pop_back();
 		return expr_.get();
 	}
-	return ctxt.call_stack.back();
+	return ctxt.call_stack.back().first;
 }
 
 const Expr *ExprFunc::eval(Context &ctxt) const {
@@ -147,7 +147,7 @@ const Expr *ExprFunc::eval(Context &ctxt) const {
 			ctxt.scope_stack.front()[id_->name_] = ctxt.res.back();
 		return parent_;
 	}
-	return ctxt.call_stack.back();
+	return ctxt.call_stack.back().first;
 }
 
 const Expr *ExprApply::eval(Context &ctxt) const {
@@ -161,8 +161,8 @@ const Expr *ExprApply::eval(Context &ctxt) const {
 	if (ctxt.prev == id_.get()) {
 		Func func = ctxt.res.back();
 		ctxt.res.pop_back();
-		ctxt.call_stack.push_back(this);
-		ctxt.scope_stack.emplace_back();
+		ctxt.call_stack.emplace_back(this, std::move(ctxt.scope_stack));
+		ctxt.scope_stack = {ctxt.call_stack.back().second.front(), VarsT{}};	//emplace only the global scope and func scope
 		auto &&func_scope = ctxt.scope_stack.back();
 		auto res_it = ctxt.res.rbegin();
 		for (auto &&decl : *func.decls_)
@@ -171,6 +171,8 @@ const Expr *ExprApply::eval(Context &ctxt) const {
 		ctxt.res.emplace_back();
 		return func.body_;
 	}
+	ctxt.call_stack.back().second.front() = std::move(ctxt.scope_stack.front());
+	ctxt.scope_stack = std::move(ctxt.call_stack.back().second);
 	ctxt.call_stack.pop_back();
 	return parent_;
 }
