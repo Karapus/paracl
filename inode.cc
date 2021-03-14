@@ -127,12 +127,11 @@ INode *AST::makeDeclListTerm() {
 }
 
 INode *AST::makeExprList(INode *exprlist, INode *expr) {
-	static_cast<ExprList *>(exprlist)->push_back(static_cast<Expr *>(expr));
-	return exprlist;
+	return new ExprList{static_cast<ExprList *>(exprlist), static_cast<Expr *>(expr)};
 }
 
 INode *AST::makeExprListTerm() {
-	return new ExprList{};
+	return nullptr;
 }
 
 INode *AST::makeStmReturn(INode *expr) {

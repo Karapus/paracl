@@ -198,26 +198,17 @@ public:
 	}
 };
 
-struct ExprList : public INode {
+struct ExprList : public Expr {
 private:
-	std::vector<Expr *> cner_;
+	std::unique_ptr<ExprList> tail_;
+	std::unique_ptr<Expr> head_;
 public:
-	~ExprList() {
-		for (auto expr : cner_)
-			delete expr;
+	ExprList(ExprList *tail, Expr *head) : tail_(tail), head_(head) {
+		head_->parent_ = this;
+		if (tail_)
+			tail_->parent_ = this;
 	}
-	auto begin() {
-		return cner_.begin();
-	}
-	auto end() {
-		return cner_.end();
-	}
-	auto size() const {
-		return cner_.size();
-	}
-	auto push_back(Expr *expr) {
-		return cner_.push_back(expr);
-	}
+	const Expr *eval(Context &ctxt) const override; 
 };
 
 struct Scope : public Expr {
@@ -333,8 +324,8 @@ private:
 public:
 	ExprApply(ExprId *i, ExprList *o) : id_(i), ops_(o) {
 		id_->parent_ = this;
-		for (auto expr : *ops_)
-			expr->parent_ = this;
+		if (ops_)
+			ops_->parent_ = this;
 	}
 	const Expr *eval(Context &ctxt) const override;
 };
