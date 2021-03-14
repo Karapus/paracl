@@ -1,8 +1,5 @@
 #pragma once
 #include "inode.hh"
-#include "exec.hh"
-#include <iostream>
-#include <map>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -146,9 +143,8 @@ struct Node {
 	virtual ~Node() = default;
 };
 
-struct Expr : public Node, public IExecable {
+struct Expr : public Node, public INode {
 	virtual const Expr *eval(Context &ctxt) const = 0;
-	void exec() override;
 };
 
 struct BinOp : public Node, public INode {

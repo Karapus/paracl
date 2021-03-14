@@ -7,6 +7,6 @@ int main(int argc, char **argv) {
 	yy::Driver driver{&code_file};
 	auto root = driver.parse();
 	if (root)
-		root->exec();
+		exec(root);
 	delete root;
 }

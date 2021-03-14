@@ -1,9 +1,14 @@
 #pragma once
-#include "inode.hh"
+#include "ast.hh"
 namespace AST {
 
-struct IExecable : public INode {
-	virtual void exec() = 0;
+struct Context {
+	using ScopeStackT = std::vector<VarsT>;
+	ScopeStackT scope_stack;
+	std::vector<std::pair<const ExprApply *, ScopeStackT>> call_stack;
+	const Expr *prev = nullptr;
+	std::vector<Value> res;
 };
 
+void exec(const INode *root);
 }

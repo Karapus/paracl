@@ -1,4 +1,5 @@
 #include "grammar.tab.hh"
+#include "inode.hh"
 #include "lexer.hh"
 #include "exec.hh"
 #include <iostream>
@@ -9,11 +10,11 @@ struct Driver final {
 	AST::INode *yylval;
 	Driver(std::istream *is) : lexer(is), yylval(nullptr)
 	{}
-	AST::IExecable *parse() {
+	AST::INode *parse() {
 		yy::parser parser{*this};
 		if (parser())
 			return nullptr;
-		return static_cast<AST::IExecable *>(yylval);
+		return static_cast<AST::INode *>(yylval);
 	}
 };
 }

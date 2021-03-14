@@ -1,0 +1,5 @@
+f = func (n) : foo {
+	if (n)
+		foo(n-1);
+}
+foo(?);

@@ -1,38 +1,26 @@
-#include "ast.hh"
-#include <utility>
+#include "exec.hh"
 #include <cassert>
 #include <iostream>
+#include <new>
 
 namespace AST {
 
-struct Context {
-	using ScopeStackT = std::vector<VarsT>;
-	ScopeStackT scope_stack;
-	std::vector<std::pair<const ExprApply *, ScopeStackT>> call_stack;
-	const Expr *prev;
-	std::vector<Value> res;
-	void operator() (const Expr *expr);
-};
-
-void Context::operator() (const Expr *expr) {
-	auto root_par = static_cast<const Expr *>(expr->parent_);
-	prev = root_par;
-	res.emplace_back();
-	while (expr != root_par) {
-		auto tmp = expr->eval(*this);
-		prev = expr;
-		expr = tmp;
-	}
-	assert(res.size() == 1);
-}
-
-void Expr::exec() {
+void exec(const INode *root) {
+	auto expr = static_cast<const Expr *>(root);
 	Context ctxt;
+	ctxt.res.emplace_back();
 	try {
-		ctxt(this);
-	} catch (std::logic_error& err) {
+		while (expr) {
+			auto tmp = expr->eval(ctxt);
+			ctxt.prev = expr;
+			expr = tmp;
+		}
+	} catch (const std::logic_error& err) {
 		std::cout << "Semantic error: " << err.what() << std::endl;
+	} catch (const std::bad_alloc& ba) {
+		std::cout << "Context is to large: " << ba.what() << std::endl;
 	}
+	assert(ctxt.res.size() == 1);
 }
 
 const Expr *BlockList::eval(Context &ctxt) const {
