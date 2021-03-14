@@ -158,8 +158,8 @@ const Expr *ExprApply::eval(Context &ctxt) const {
 		ctxt.scope_stack = {ctxt.call_stack.back().second.front(), VarsT{}};	//emplace only the global scope and func scope
 		auto &&func_scope = ctxt.scope_stack.back();
 		auto res_it = ctxt.res.rbegin();
-		for (auto &&decl : *func.decls_)
-			func_scope.emplace(decl, *res_it++);
+		for (auto it = func.decls_->cbegin(), end = func.decls_->cend(); it != end; ++it)
+			func_scope.emplace(*it, *res_it++);
 		ctxt.res.erase(res_it.base(), ctxt.res.end());
 		ctxt.res.emplace_back();
 		return func.body_;

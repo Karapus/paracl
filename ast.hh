@@ -1,6 +1,5 @@
 #pragma once
 #include "inode.hh"
-#include <bits/c++config.h>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -24,11 +23,10 @@ struct IncorrectTypeExcept : public std::logic_error {
 };
 
 struct Func {
-	Scope *body_;
-	DeclList *decls_;
-	Func(Scope *body, DeclList *decls_) : body_(body), decls_(decls_) {
+	const Scope *body_;
+	const DeclList *decls_;
+	Func(const Scope *body, const DeclList *decls_) : body_(body), decls_(decls_) {
 	}
-	void apply(Context &ctxt, ExprList *ops);
 };
 
 
@@ -181,11 +179,11 @@ struct DeclList : public INode {
 private:
 	std::vector<std::string> cner_;
 public:
-	auto begin() {
-		return cner_.begin();
+	auto cbegin() const {
+		return cner_.cbegin();
 	}
-	auto end() {
-		return cner_.end();
+	auto cend() const {
+		return cner_.cend();
 	}
 	auto size() const {
 		return cner_.size();
