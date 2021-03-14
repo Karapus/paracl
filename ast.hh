@@ -1,5 +1,6 @@
 #pragma once
 #include "inode.hh"
+#include <bits/c++config.h>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -204,7 +205,10 @@ public:
 		if (tail_)
 			tail_->parent_ = this;
 	}
-	const Expr *eval(Context &ctxt) const override; 
+	const Expr *eval(Context &ctxt) const override;
+	std::size_t size() const {
+		return tail_ ? (tail_->size() + 1) : 1;
+	}
 };
 
 struct Scope : public Expr {

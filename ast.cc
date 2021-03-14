@@ -2,6 +2,7 @@
 #include <cassert>
 #include <iostream>
 #include <new>
+#include <stdexcept>
 
 namespace AST {
 
@@ -15,12 +16,12 @@ void exec(const INode *root) {
 			ctxt.prev = expr;
 			expr = tmp;
 		}
+		assert(ctxt.res.size() == 1);
 	} catch (const std::logic_error& err) {
 		std::cout << "Semantic error: " << err.what() << std::endl;
 	} catch (const std::bad_alloc& ba) {
 		std::cout << "Context is to large: " << ba.what() << std::endl;
 	}
-	assert(ctxt.res.size() == 1);
 }
 
 const Expr *BlockList::eval(Context &ctxt) const {
@@ -125,6 +126,8 @@ const Expr *StmReturn::eval(Context &ctxt) const {
 		ctxt.res.pop_back();
 		return expr_.get();
 	}
+	if (ctxt.call_stack.empty())
+		throw std::logic_error("Return without call");
 	return ctxt.call_stack.back().first;
 }
 
@@ -149,6 +152,8 @@ const Expr *ExprApply::eval(Context &ctxt) const {
 	if (ctxt.prev == id_.get()) {
 		Func func = ctxt.res.back();
 		ctxt.res.pop_back();
+		if ((ops_ ? ops_->size() : 0) != func.decls_->size())
+			throw std::logic_error("Incorrect number of arguments");
 		ctxt.call_stack.emplace_back(this, std::move(ctxt.scope_stack));
 		ctxt.scope_stack = {ctxt.call_stack.back().second.front(), VarsT{}};	//emplace only the global scope and func scope
 		auto &&func_scope = ctxt.scope_stack.back();
