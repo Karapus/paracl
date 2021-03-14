@@ -225,6 +225,16 @@ public:
 	const Expr *eval(Context &ctxt) const override; 
 };
 
+struct StmExpr : public Expr {
+private:
+	std::unique_ptr<Expr> expr_;
+public:
+	StmExpr(Expr *e) : expr_(e) {
+		expr_->parent_ = this;
+	}
+	const Expr *eval(Context &ctxt) const override;
+};
+
 struct StmPrint : public Expr {
 private:
 	std::unique_ptr<Expr> expr_;

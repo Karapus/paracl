@@ -21,7 +21,7 @@ INode *AST::makeBlockListTerm() {
 }
 
 INode *AST::makeStmExpr(INode *expr) {
-	return expr;
+	return new StmExpr{static_cast<Expr *>(expr)};
 }
 
 INode *AST::makeStmPrint(INode *expr) {

@@ -17,12 +17,13 @@ struct Context {
 void Context::operator() (const Expr *expr) {
 	auto root_par = static_cast<const Expr *>(expr->parent_);
 	prev = root_par;
+	res.emplace_back();
 	while (expr != root_par) {
 		auto tmp = expr->eval(*this);
 		prev = expr;
 		expr = tmp;
 	}
-//	assert(res.size() == 1);
+	assert(res.size() == 1);
 }
 
 void Expr::exec() {
@@ -38,11 +39,9 @@ const Expr *BlockList::eval(Context &ctxt) const {
 	if (ctxt.prev == parent_) {
 		if (blocks_)
 			return blocks_.get();
-		ctxt.res.pop_back();
 		return block_.get();
 	}
 	if (ctxt.prev == blocks_.get()) {
-		ctxt.res.pop_back();
 		return block_.get();
 	}
 	return parent_;
@@ -54,49 +53,54 @@ const Expr *Scope::eval(Context &ctxt) const {
 			ctxt.scope_stack.pop_back();
 		return parent_;
 	}
-	ctxt.res.emplace_back();
 	if (blocks) {
 		ctxt.scope_stack.emplace_back();
 		return blocks;
+	}
+	ctxt.res.back() = Value{};
+	return parent_;
+}
+
+const Expr *StmExpr::eval(Context &ctxt) const {
+	if (ctxt.prev == parent_) {
+		ctxt.res.pop_back();
+		return expr_.get();
 	}
 	return parent_;
 }
 
 const Expr *StmPrint::eval(Context &ctxt) const {
-	if (ctxt.prev == parent_)
+	if (ctxt.prev == parent_) {
+		ctxt.res.pop_back();
 		return expr_.get();
+	}
 	std::cout << static_cast<int>(ctxt.res.back()) << std::endl;
 	return parent_;
 }
 
 const Expr *StmWhile::eval(Context &ctxt) const {
-	if (ctxt.prev == parent_) {
-		ctxt.res.emplace_back();
-		return expr_.get();
-	}
-	if (ctxt.prev == block_.get()) {
+	if (ctxt.prev == parent_ || ctxt.prev == block_.get()) {
+		ctxt.res.pop_back();
 		return expr_.get();
 	}
 	bool flag = ctxt.res.back();
-	ctxt.res.pop_back();
 	if (flag && block_) {
-		ctxt.res.pop_back();
 		return block_.get();
 	}
 	return parent_;
 }
 
 const Expr *StmIf::eval(Context &ctxt) const {
-	if (ctxt.prev == parent_)
-		return expr_.get();
-	if (ctxt.prev == expr_.get()) {
-		bool is_true = ctxt.res.back();
+	if (ctxt.prev == parent_) {
 		ctxt.res.pop_back();
-		if (is_true)
+		return expr_.get();
+	}
+	if (ctxt.prev == expr_.get()) {
+		bool flag = ctxt.res.back();
+		if (flag)
 			return true_block_.get();
 		if (false_block_)
 			return false_block_.get();
-		ctxt.res.emplace_back();
 	}
 	return parent_;
 }
@@ -105,6 +109,7 @@ const Expr *ExprInt::eval(Context &ctxt) const {
 	ctxt.res.emplace_back(val_);
 	return parent_;
 }
+
 const Expr *ExprId::eval(Context &ctxt) const {
 	for (auto it = ctxt.scope_stack.rbegin(), end = ctxt.scope_stack.rend(); it != end; ++it) {
 		auto var = it->find(name_);
@@ -129,7 +134,7 @@ const Expr *ExprList::eval(Context &ctxt) const {
 
 const Expr *StmReturn::eval(Context &ctxt) const {
 	if (ctxt.prev == parent_) {
-		//ctxt.res.pop_back();
+		ctxt.res.pop_back();
 		return expr_.get();
 	}
 	return ctxt.call_stack.back();
@@ -147,7 +152,7 @@ const Expr *ExprFunc::eval(Context &ctxt) const {
 
 const Expr *ExprApply::eval(Context &ctxt) const {
 	if (ctxt.prev == parent_) {
-		if (ops_.get())
+		if (ops_)
 			return ops_.get();
 		return id_.get();
 	}
@@ -159,10 +164,11 @@ const Expr *ExprApply::eval(Context &ctxt) const {
 		ctxt.call_stack.push_back(this);
 		ctxt.scope_stack.emplace_back();
 		auto &&func_scope = ctxt.scope_stack.back();
-		for (auto &&decl : *func.decls_) {
-			func_scope.emplace(decl, ctxt.res.back());
-			ctxt.res.pop_back();
-		}
+		auto res_it = ctxt.res.rbegin();
+		for (auto &&decl : *func.decls_)
+			func_scope.emplace(decl, *res_it++);
+		ctxt.res.erase(res_it.base(), ctxt.res.end());
+		ctxt.res.emplace_back();
 		return func.body_;
 	}
 	ctxt.call_stack.pop_back();
