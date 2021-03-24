@@ -10,7 +10,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${COMON_CXX_FLAGS} -g -O0")
 set(SRC_LIST inode.cc ast.cc driver.cc)
 
 find_package(BISON)
-BISON_TARGET(Parser grammar.yy ${CMAKE_CURRENT_BINARY_DIR}/grammar.tab.cc VERBOSE COMPILE_FLAGS "-Wall -rall")
+BISON_TARGET(Parser grammar.yy ${CMAKE_CURRENT_BINARY_DIR}/grammar.tab.cc VERBOSE COMPILE_FLAGS "-Wall")
 
 find_package(FLEX)
 FLEX_TARGET(Scanner lexer.ll ${CMAKE_CURRENT_BINARY_DIR}/lexer.cpp)

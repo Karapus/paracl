@@ -6,6 +6,7 @@
 #include <vector>
 #include <functional>
 #include <memory>
+#include <iostream>
 
 namespace AST {
 
@@ -209,6 +210,10 @@ public:
 	}
 };
 
+struct Empty : public Expr {
+	const Expr *eval(Context &ctxt) const override; 
+};
+
 struct Scope : public Expr {
 private:
 	BlockList *blocks;
@@ -223,44 +228,36 @@ public:
 	const Expr *eval(Context &ctxt) const override; 
 };
 
-struct StmExpr : public Expr {
+struct Seq : public Expr {
 private:
-	std::unique_ptr<Expr> expr_;
+	std::unique_ptr<Expr> fst_;
+	std::unique_ptr<Expr> snd_;
 public:
-	StmExpr(Expr *e) : expr_(e) {
-		expr_->parent_ = this;
+	Seq(Expr *fst, Expr *snd) : fst_(fst), snd_(snd) {
+		fst_->parent_ = this;
+		snd_->parent_ = this;
 	}
-	const Expr *eval(Context &ctxt) const override;
+	const Expr *eval(Context &ctxt) const override; 
 };
 
-struct StmPrint : public Expr {
-private:
-	std::unique_ptr<Expr> expr_;
-public:
-	StmPrint(Expr *e) : expr_(e) {
-		expr_->parent_ = this;
-	}
-	const Expr *eval(Context &ctxt) const override;
-};
-
-struct StmWhile : public Expr {
+struct While : public Expr {
 private:
 	std::unique_ptr<Expr> expr_;
 	std::unique_ptr<Expr> block_;
 public:
-	StmWhile(Expr *e, Expr *b) : expr_(e), block_(b) {
+	While(Expr *e, Expr *b) : expr_(e), block_(b) {
 		expr_->parent_ = block_->parent_ = this;
 	}
 	const Expr *eval(Context &ctxt) const override;
 };
 
-struct StmIf : public Expr {
+struct If : public Expr {
 private:
 	std::unique_ptr<Expr> expr_;
 	std::unique_ptr<Expr> true_block_;
 	std::unique_ptr<Expr> false_block_;
 public:
-	StmIf(Expr *e, Expr *tb, Expr *fb) : expr_(e), true_block_(tb), false_block_(fb) {
+	If(Expr *e, Expr *tb, Expr *fb) : expr_(e), true_block_(tb), false_block_(fb) {
 		expr_->parent_ = this;
 		true_block_->parent_ = this;
 		if (false_block_)
@@ -269,11 +266,11 @@ public:
 	const Expr *eval(Context &ctxt) const override;
 };
 
-struct StmReturn : public Expr {
+struct Return : public Expr {
 private:
 	std::unique_ptr<Expr> expr_;
 public:
-	StmReturn(Expr *expr) : expr_(expr) {
+	Return(Expr *expr) : expr_(expr) {
 		expr_->parent_ = this;
 	}
 	const Expr *eval(Context &ctxt) const override;
@@ -441,6 +438,12 @@ struct UnOpMinus : public UnOp {
 struct UnOpNot : public UnOp {
 	Value operator() (Value val) override {
 		as_int(std::logical_not<int>{}, val);
+		return val;
+	}
+};
+struct UnOpPrint : public UnOp {
+	Value operator() (Value val) override {
+		as_int([](int a) {std::cout << a << std::endl; return a; }, val);
 		return val;
 	}
 };

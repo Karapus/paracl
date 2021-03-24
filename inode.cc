@@ -12,28 +12,20 @@ INode *AST::makeScope(INode *blocks) {
 	return new Scope{static_cast<BlockList *>(blocks)};
 }
 
-INode *AST::makeBlockList(INode *blocks, INode *block) {
-	return new BlockList(static_cast<BlockList *>(blocks), static_cast<Expr *>(block));
+INode *AST::makeEmpty() {
+	return new Empty{};
 }
 
-INode *AST::makeBlockListTerm() {
-	return nullptr;
+INode *AST::makeWhile(INode *expr, INode *block) {
+	return new While{static_cast<Expr *>(expr), static_cast<Expr *>(block)};
 }
 
-INode *AST::makeStmExpr(INode *expr) {
-	return new StmExpr{static_cast<Expr *>(expr)};
+INode *AST::makeIf(INode *expr, INode *true_block, INode *false_block) {
+	return new If{static_cast<Expr *>(expr), static_cast<Expr *>(true_block), static_cast<Expr *>(false_block)};
 }
 
-INode *AST::makeStmPrint(INode *expr) {
-	return new StmPrint{static_cast<Expr *>(expr)};
-}
-
-INode *AST::makeStmWhile(INode *expr, INode *block) {
-	return new StmWhile{static_cast<Expr *>(expr), static_cast<Expr *>(block)};
-}
-
-INode *AST::makeStmIf(INode *expr, INode *true_block, INode *false_block) {
-	return new StmIf{static_cast<Expr *>(expr), static_cast<Expr *>(true_block), static_cast<Expr *>(false_block)};
+INode *AST::makeSeq(INode *fst, INode *snd) {
+	return new Seq{static_cast<Expr *>(fst), static_cast<Expr *>(snd)};
 }
 
 INode *AST::makeExprBinop(INode *binop, INode *lhs, INode *rhs) {
@@ -104,12 +96,12 @@ INode *AST::makeUnOpNot() {
 	 return new UnOpNot{};
 }
 
-INode *AST::makeExprApply(INode *id, INode *ops) {
-	return new ExprApply{static_cast<ExprId *>(id), static_cast<ExprList *>(ops)};
+INode *AST::makeUnOpPrint() {
+	return new UnOpPrint{};
 }
 
-INode *AST::makeExprFunc(INode *scope, INode *declist) {
-	return new ExprFunc{static_cast<Scope *>(scope), static_cast<DeclList *>(declist)};
+INode *AST::makeExprApply(INode *id, INode *ops) {
+	return new ExprApply{static_cast<ExprId *>(id), static_cast<ExprList *>(ops)};
 }
 
 INode *AST::makeExprFunc(INode *scope, INode *declist, INode *id) {
@@ -134,6 +126,6 @@ INode *AST::makeExprListTerm() {
 	return nullptr;
 }
 
-INode *AST::makeStmReturn(INode *expr) {
-	return new StmReturn{static_cast<Expr *>(expr)};
+INode *AST::makeReturn(INode *expr) {
+	return new Return{static_cast<Expr *>(expr)};
 }

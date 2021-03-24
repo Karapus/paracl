@@ -9,7 +9,6 @@ namespace AST {
 void exec(const INode *root) {
 	auto expr = static_cast<const Expr *>(root);
 	Context ctxt;
-	ctxt.res.emplace_back();
 	try {
 		while (expr) {
 			auto tmp = expr->eval(ctxt);
@@ -20,19 +19,12 @@ void exec(const INode *root) {
 	} catch (const std::logic_error& err) {
 		std::cout << "Semantic error: " << err.what() << std::endl;
 	} catch (const std::bad_alloc& ba) {
-		std::cout << "Context is to large: " << ba.what() << std::endl;
+		std::cout << "Context is too large: " << ba.what() << std::endl;
 	}
 }
 
-const Expr *BlockList::eval(Context &ctxt) const {
-	if (ctxt.prev == parent_) {
-		if (blocks_)
-			return blocks_.get();
-		return block_.get();
-	}
-	if (ctxt.prev == blocks_.get()) {
-		return block_.get();
-	}
+const Expr *Empty::eval(Context &ctxt) const {
+	ctxt.res.emplace_back();
 	return parent_;
 }
 
@@ -46,50 +38,46 @@ const Expr *Scope::eval(Context &ctxt) const {
 		ctxt.scope_stack.emplace_back();
 		return blocks;
 	}
-	ctxt.res.back() = Value{};
+	ctxt.res.emplace_back();
 	return parent_;
 }
 
-const Expr *StmExpr::eval(Context &ctxt) const {
-	if (ctxt.prev == parent_) {
+const Expr *Seq::eval(Context &ctxt) const {
+	if (ctxt.prev == parent_)
+		return fst_.get();
+	if (ctxt.prev == fst_.get()) {
 		ctxt.res.pop_back();
-		return expr_.get();
+		return snd_.get();
 	}
 	return parent_;
 }
 
-const Expr *StmPrint::eval(Context &ctxt) const {
-	if (ctxt.prev == parent_) {
-		ctxt.res.pop_back();
+const Expr *While::eval(Context &ctxt) const {
+	if (ctxt.prev == parent_)
 		return expr_.get();
-	}
-	std::cout << static_cast<int>(ctxt.res.back()) << std::endl;
-	return parent_;
-}
-
-const Expr *StmWhile::eval(Context &ctxt) const {
-	if (ctxt.prev == parent_ || ctxt.prev == block_.get()) {
+	if (ctxt.prev == block_.get()) {
 		ctxt.res.pop_back();
 		return expr_.get();
 	}
 	bool flag = ctxt.res.back();
 	if (flag && block_) {
+		ctxt.res.pop_back();
 		return block_.get();
 	}
 	return parent_;
 }
 
-const Expr *StmIf::eval(Context &ctxt) const {
-	if (ctxt.prev == parent_) {
-		ctxt.res.pop_back();
+const Expr *If::eval(Context &ctxt) const {
+	if (ctxt.prev == parent_)
 		return expr_.get();
-	}
 	if (ctxt.prev == expr_.get()) {
 		bool flag = ctxt.res.back();
+		ctxt.res.pop_back();
 		if (flag)
 			return true_block_.get();
 		if (false_block_)
 			return false_block_.get();
+		ctxt.res.emplace_back();
 	}
 	return parent_;
 }
@@ -121,11 +109,9 @@ const Expr *ExprList::eval(Context &ctxt) const {
 	return parent_;
 }
 
-const Expr *StmReturn::eval(Context &ctxt) const {
-	if (ctxt.prev == parent_) {
-		ctxt.res.pop_back();
+const Expr *Return::eval(Context &ctxt) const {
+	if (ctxt.prev == parent_)
 		return expr_.get();
-	}
 	if (ctxt.call_stack.empty())
 		throw std::logic_error("Return without call");
 	return ctxt.call_stack.back().first;
@@ -161,7 +147,6 @@ const Expr *ExprApply::eval(Context &ctxt) const {
 		for (auto it = func.decls_->cbegin(), end = func.decls_->cend(); it != end; ++it)
 			func_scope.emplace(*it, *res_it++);
 		ctxt.res.erase(res_it.base(), ctxt.res.end());
-		ctxt.res.emplace_back();
 		return func.body_;
 	}
 	ctxt.call_stack.back().second.front() = std::move(ctxt.scope_stack.front());
