@@ -28,88 +28,12 @@ INode *AST::makeSeq(INode *fst, INode *snd) {
 	return new Seq{static_cast<Expr *>(fst), static_cast<Expr *>(snd)};
 }
 
-INode *AST::makeExprBinop(INode *binop, INode *lhs, INode *rhs) {
-	return new ExprBinOp{static_cast<BinOp *>(binop), static_cast<Expr *>(lhs), static_cast<Expr *>(rhs)};
-}
-
 INode *AST::makeExprAssign(INode *id, INode *val) {
 	return new ExprAssign{static_cast<ExprId *>(id), static_cast<Expr *>(val)};
 }
 
-INode *AST::makeExprUnop(INode *unop, INode *expr) {
-	return new ExprUnOp{static_cast<UnOp *>(unop), static_cast<Expr *>(expr)};
-}
-
 INode *AST::makeExprQmark() {
 	return new ExprQmark{};
-}
-
-INode *AST::makeBinOpMul() {
-	 return new BinOpMul{};
-}
-
-INode *AST::makeBinOpDiv() {
-	 return new BinOpDiv{};
-}
-
-INode *AST::makeBinOpMod() {
-	 return new BinOpMod{};
-}
-
-INode *AST::makeBinOpPlus() {
-	 return new BinOpPlus{};
-}
-
-INode *AST::makeBinOpMinus() {
-	 return new BinOpMinus{};
-}
-
-INode *AST::makeBinOpLess() {
-	 return new BinOpLess{};
-}
-
-INode *AST::makeBinOpGrtr() {
-	 return new BinOpGrtr{};
-}
-
-INode *AST::makeBinOpLessOrEq() {
-	 return new BinOpLessOrEq{};
-}
-
-INode *AST::makeBinOpGrtrOrEq() {
-	 return new BinOpGrtrOrEq{};
-}
-
-INode *AST::makeBinOpEqual() {
-	 return new BinOpEqual{};
-}
-
-INode *AST::makeBinOpNotEqual() {
-	 return new BinOpNotEqual{};
-}
-
-INode *AST::makeBinOpAnd() {
-	 return new BinOpAnd{};
-}
-
-INode *AST::makeBinOpOr() {
-	 return new BinOpOr{};
-}
-
-INode *AST::makeUnOpPlus() {
-	 return new UnOpPlus{};
-}
-
-INode *AST::makeUnOpMinus() {
-	 return new UnOpMinus{};
-}
-
-INode *AST::makeUnOpNot() {
-	 return new UnOpNot{};
-}
-
-INode *AST::makeUnOpPrint() {
-	return new UnOpPrint{};
 }
 
 INode *AST::makeExprApply(INode *id, INode *ops) {

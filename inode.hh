@@ -1,10 +1,7 @@
 #pragma once
 #include <string>
+#include "ast.hh"
 namespace AST {
-struct INode {
-	virtual ~INode()
-	{}
-};
 
 INode *makeExprInt(int num);
 INode *makeExprId(std::string name);
@@ -19,28 +16,17 @@ INode *makeIf(INode *expr, INode *true_block, INode *false_block = nullptr);
 INode *makeReturn(INode *expr);
 
 INode *makeSeq(INode *fst, INode *snd);
-INode *makeExprBinop(INode *binop, INode *lhs, INode *rhs);
 INode *makeExprAssign(INode *id, INode *val);
-INode *makeExprUnop(INode *unop, INode *expr);
 
-INode *makeBinOpMul();
-INode *makeBinOpDiv();
-INode *makeBinOpMod();
-INode *makeBinOpPlus();
-INode *makeBinOpMinus();
-INode *makeBinOpLess();
-INode *makeBinOpGrtr();
-INode *makeBinOpLessOrEq();
-INode *makeBinOpGrtrOrEq();
-INode *makeBinOpEqual();
-INode *makeBinOpNotEqual();
-INode *makeBinOpAnd();
-INode *makeBinOpOr();
+template <typename T>
+INode *makeExprBinop(INode *lhs, INode *rhs) {
+	return new ExprBinOp<T>{static_cast<Expr *>(lhs), static_cast<Expr *>(rhs)};
+}
 
-INode *makeUnOpPlus();
-INode *makeUnOpMinus();
-INode *makeUnOpNot();
-INode *makeUnOpPrint();
+template <typename T>
+INode *makeExprUnop(INode *expr) {
+	return new ExprUnOp<T>{static_cast<Expr *>(expr)};
+}
 
 INode *makeExprApply(INode *id, INode *ops);
 INode *makeExprFunc(INode *scope, INode *declist, INode *id = nullptr);

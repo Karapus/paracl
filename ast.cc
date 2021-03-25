@@ -1,4 +1,4 @@
-#include "exec.hh"
+#include "ast.hh"
 #include <cassert>
 #include <iostream>
 #include <new>
@@ -116,8 +116,6 @@ const Expr *ExprList::eval(Context &ctxt) const {
 const Expr *Return::eval(Context &ctxt) const {
 	if (ctxt.prev == parent_)
 		return expr_.get();
-	if (ctxt.call_stack.empty())
-		throw std::logic_error("Return without call");
 	return ctxt.call_stack.back();
 }
 
@@ -141,8 +139,9 @@ const Expr *ExprApply::eval(Context &ctxt) const {
 		return id_.get();
 	if (ctxt.prev == id_.get()) {
 		ctxt.ctxts_stack.emplace_back(std::move(ctxt.scope_stack));
-		ctxt.scope_stack = {ctxt.ctxts_stack.back().front(), VarsT{}};	//only the global scope and func scope
+		ctxt.scope_stack = {ctxt.ctxts_stack.back().front(), VarsT{}};
 		ctxt.call_stack.emplace_back(this);
+
 		Func func = ctxt.res.back();
 		ctxt.res.pop_back();
 		if ((ops_ ? ops_->size() : 0) != func.decls_->size())
@@ -152,6 +151,7 @@ const Expr *ExprApply::eval(Context &ctxt) const {
 		for (auto it = func.decls_->cbegin(), end = func.decls_->cend(); it != end; ++it)
 			func_scope.emplace(*it, *res_it++);
 		ctxt.res.erase(res_it.base(), ctxt.res.end());
+		
 		return func.body_;
 	}
 	ctxt.ctxts_stack.back().front() = std::move(ctxt.scope_stack.front());
@@ -182,29 +182,6 @@ const Expr *ExprAssign::eval(Context &ctxt) const {
 	};
 	if (std::all_of(ctxt.scope_stack.rbegin(), ctxt.scope_stack.rend(), pred))
 		ctxt.scope_stack.back()[name] = std::move(val);
-	return parent_;
-}
-
-
-const Expr *ExprBinOp::eval(Context &ctxt) const {
-	if (ctxt.prev == parent_)
-		return lhs_.get();
-	if (ctxt.prev == lhs_.get())
-		return rhs_.get();
-	auto r = std::move(ctxt.res.back());
-	ctxt.res.pop_back();
-	auto l = std::move(ctxt.res.back());
-	ctxt.res.pop_back();
-	ctxt.res.emplace_back((*op_)(l, r));
-	return parent_;
-}
-
-const Expr *ExprUnOp::eval(Context &ctxt) const {
-	if (ctxt.prev == parent_)
-		return rhs_.get();
-	auto r = ctxt.res.back();
-	ctxt.res.pop_back();
-	ctxt.res.emplace_back((*op_)(r));
 	return parent_;
 }
 }

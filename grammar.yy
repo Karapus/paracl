@@ -59,7 +59,7 @@
 	RETURN
 
 %destructor { delete $$; } ID NUM scope blocks block
-	stm cexpr fexpr expr unop func declist decls
+	stm cexpr fexpr expr func declist decls
 	applist exprs
 
 %right ELSE THEN
@@ -104,46 +104,45 @@ cexpr	: LPAR expr RPAR	{ $$ = $2; 	}
 	| ID ASSIGN expr	{ $$ = AST::makeExprAssign($1, $3);	}
 	| ID applist		{ $$ = AST::makeExprApply($1, $2);	}
 	| RETURN expr		{ $$ = AST::makeReturn($2);		}
-	| PRINT expr		{ $$ = AST::makeExprUnop(AST::makeUnOpPrint(), $2);	}
-	| unop expr	%prec UNOP	{ $$ = AST::makeExprUnop($1, $2);		}
+	| PRINT expr		{ $$ = AST::makeExprUnop<AST::UnOpPrint	>($2);	}
+	| PLUS	expr %prec UNOP	{ $$ = AST::makeExprUnop<AST::UnOpPlus	>($2);	}
+	| MINUS	expr %prec UNOP	{ $$ = AST::makeExprUnop<AST::UnOpMinus	>($2);	}
+	| EXCL	expr %prec UNOP	{ $$ = AST::makeExprUnop<AST::UnOpNot	>($2);	}
+;
+
 ;
 
 fexpr	: cexpr		{$$ = $1; }
-	| fexpr PLUS	{ $$ = AST::makeBinOpPlus();	} expr { $$ = AST::makeExprBinop($3, $1, $4); }
-	| fexpr MINUS	{ $$ = AST::makeBinOpMinus();	} expr { $$ = AST::makeExprBinop($3, $1, $4); }
-	| fexpr STAR	{ $$ = AST::makeBinOpMul();	} expr { $$ = AST::makeExprBinop($3, $1, $4); }
-	| fexpr SLASH	{ $$ = AST::makeBinOpDiv();	} expr { $$ = AST::makeExprBinop($3, $1, $4); }
-	| fexpr PERCNT	{ $$ = AST::makeBinOpMod();	} expr { $$ = AST::makeExprBinop($3, $1, $4); }
-	| fexpr LT	{ $$ = AST::makeBinOpLess();	} expr { $$ = AST::makeExprBinop($3, $1, $4); }
-	| fexpr GT	{ $$ = AST::makeBinOpGrtr();	} expr { $$ = AST::makeExprBinop($3, $1, $4); }
-	| fexpr LE	{ $$ = AST::makeBinOpLessOrEq();} expr { $$ = AST::makeExprBinop($3, $1, $4); }
-	| fexpr GE	{ $$ = AST::makeBinOpGrtrOrEq();} expr { $$ = AST::makeExprBinop($3, $1, $4); }
-	| fexpr EQ	{ $$ = AST::makeBinOpEqual();	} expr { $$ = AST::makeExprBinop($3, $1, $4); }
-	| fexpr NEQ	{ $$ = AST::makeBinOpNotEqual();} expr { $$ = AST::makeExprBinop($3, $1, $4); }
-	| fexpr AND	{ $$ = AST::makeBinOpAnd();	} expr { $$ = AST::makeExprBinop($3, $1, $4); }
-	| fexpr OR	{ $$ = AST::makeBinOpOr();	} expr { $$ = AST::makeExprBinop($3, $1, $4); }
+	| fexpr PLUS	expr	{ $$ = AST::makeExprBinop<AST::BinOpPlus	>($1, $3);	}
+	| fexpr MINUS	expr	{ $$ = AST::makeExprBinop<AST::BinOpMinus	>($1, $3);	}
+	| fexpr STAR	expr	{ $$ = AST::makeExprBinop<AST::BinOpMul		>($1, $3);	}
+	| fexpr SLASH	expr	{ $$ = AST::makeExprBinop<AST::BinOpDiv		>($1, $3);	}
+	| fexpr PERCNT	expr	{ $$ = AST::makeExprBinop<AST::BinOpMod		>($1, $3);	}
+	| fexpr LT	expr	{ $$ = AST::makeExprBinop<AST::BinOpLess	>($1, $3);	}
+	| fexpr GT	expr	{ $$ = AST::makeExprBinop<AST::BinOpGrtr	>($1, $3);	}
+	| fexpr LE	expr	{ $$ = AST::makeExprBinop<AST::BinOpLessOrEq	>($1, $3);	}
+	| fexpr GE	expr	{ $$ = AST::makeExprBinop<AST::BinOpGrtrOrEq	>($1, $3);	}
+	| fexpr EQ	expr	{ $$ = AST::makeExprBinop<AST::BinOpEqual	>($1, $3);	}
+	| fexpr NEQ	expr	{ $$ = AST::makeExprBinop<AST::BinOpNotEqual	>($1, $3);	}
+	| fexpr AND	expr	{ $$ = AST::makeExprBinop<AST::BinOpAnd		>($1, $3);	}
+	| fexpr OR	expr	{ $$ = AST::makeExprBinop<AST::BinOpOr		>($1, $3);	}
 ;
 
 expr	: cexpr 	{ $$ = $1;	}
 	| stm		{ $$ = $1;	}
-	| expr PLUS	{ $$ = AST::makeBinOpPlus();	} expr { $$ = AST::makeExprBinop($3, $1, $4); }
-	| expr MINUS	{ $$ = AST::makeBinOpMinus();	} expr { $$ = AST::makeExprBinop($3, $1, $4); }
-	| expr STAR	{ $$ = AST::makeBinOpMul();	} expr { $$ = AST::makeExprBinop($3, $1, $4); }
-	| expr SLASH	{ $$ = AST::makeBinOpDiv();	} expr { $$ = AST::makeExprBinop($3, $1, $4); }
-	| expr PERCNT	{ $$ = AST::makeBinOpMod();	} expr { $$ = AST::makeExprBinop($3, $1, $4); }
-	| expr LT	{ $$ = AST::makeBinOpLess();	} expr { $$ = AST::makeExprBinop($3, $1, $4); }
-	| expr GT	{ $$ = AST::makeBinOpGrtr();	} expr { $$ = AST::makeExprBinop($3, $1, $4); }
-	| expr LE	{ $$ = AST::makeBinOpLessOrEq();} expr { $$ = AST::makeExprBinop($3, $1, $4); }
-	| expr GE	{ $$ = AST::makeBinOpGrtrOrEq();} expr { $$ = AST::makeExprBinop($3, $1, $4); }
-	| expr EQ	{ $$ = AST::makeBinOpEqual();	} expr { $$ = AST::makeExprBinop($3, $1, $4); }
-	| expr NEQ	{ $$ = AST::makeBinOpNotEqual();} expr { $$ = AST::makeExprBinop($3, $1, $4); }
-	| expr AND	{ $$ = AST::makeBinOpAnd();	} expr { $$ = AST::makeExprBinop($3, $1, $4); }
-	| expr OR	{ $$ = AST::makeBinOpOr();	} expr { $$ = AST::makeExprBinop($3, $1, $4); }
-;
-
-unop	: PLUS		{ $$ = AST::makeUnOpPlus();	}
-	| MINUS		{ $$ = AST::makeUnOpMinus();	}
-	| EXCL		{ $$ = AST::makeUnOpNot();	}
+	| expr PLUS	expr	{ $$ = AST::makeExprBinop<AST::BinOpPlus	>($1, $3);	}
+	| expr MINUS	expr	{ $$ = AST::makeExprBinop<AST::BinOpMinus	>($1, $3);	}
+	| expr STAR	expr	{ $$ = AST::makeExprBinop<AST::BinOpMul		>($1, $3);	}
+	| expr SLASH	expr	{ $$ = AST::makeExprBinop<AST::BinOpDiv		>($1, $3);	}
+	| expr PERCNT	expr	{ $$ = AST::makeExprBinop<AST::BinOpMod		>($1, $3);	}
+	| expr LT	expr	{ $$ = AST::makeExprBinop<AST::BinOpLess	>($1, $3);	}
+	| expr GT	expr	{ $$ = AST::makeExprBinop<AST::BinOpGrtr	>($1, $3);	}
+	| expr LE	expr	{ $$ = AST::makeExprBinop<AST::BinOpLessOrEq	>($1, $3);	}
+	| expr GE	expr	{ $$ = AST::makeExprBinop<AST::BinOpGrtrOrEq	>($1, $3);	}
+	| expr EQ	expr	{ $$ = AST::makeExprBinop<AST::BinOpEqual	>($1, $3);	}
+	| expr NEQ	expr	{ $$ = AST::makeExprBinop<AST::BinOpNotEqual	>($1, $3);	}
+	| expr AND	expr	{ $$ = AST::makeExprBinop<AST::BinOpAnd		>($1, $3);	}
+	| expr OR	expr	{ $$ = AST::makeExprBinop<AST::BinOpOr		>($1, $3);	}
 ;
 
 func	: FUNC declist scope		{ $$ = AST::makeExprFunc($3, $2);	}

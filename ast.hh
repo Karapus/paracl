@@ -1,5 +1,4 @@
 #pragma once
-#include "inode.hh"
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -136,7 +135,21 @@ public:
 
 using VarsT = std::unordered_map<std::string, Value>;
 
+struct INode {
+	virtual ~INode()
+	{}
+};
+
 struct Expr;
+
+struct Context {
+	using ScopeStackT = std::vector<VarsT>;
+	ScopeStackT scope_stack;
+	std::vector<const Expr *> call_stack;
+	std::vector<ScopeStackT> ctxts_stack;
+	const Expr *prev = nullptr;
+	std::vector<Value> res;
+};
 
 struct Node {
 	Expr *parent_ = nullptr;
@@ -149,18 +162,16 @@ struct Expr : public Node, public INode {
 
 struct BinOp : public Node, public INode {
 	template <typename F>
-	void as_int(F functor, int &lhs, int rhs) {
+	void as_int(F functor, int &lhs, int rhs) const {
 		lhs = functor(lhs, rhs);
 	}
-	virtual Value operator() (Value lhs, const Value &rhs) = 0;
 };
 
 struct UnOp : public Node, public INode {
 	template <typename F>
-	void as_int(F functor, int &val) {
+	void as_int(F functor, int &val) const {
 		val = functor(val);
 	}
-	virtual Value operator() (Value rhs) = 0;
 };
 
 struct BlockList : public Expr {
@@ -335,131 +346,149 @@ public:
 	const Expr *eval(Context &ctxt) const override;
 };
 
+template <typename T>
 struct ExprBinOp : public Expr {
 private:
-	std::unique_ptr<BinOp> op_;
+	T op_;
 	std::unique_ptr<Expr> lhs_;
 	std::unique_ptr<Expr> rhs_;
 public:
-	ExprBinOp(BinOp *o, Expr *l, Expr *r) : op_(o), lhs_(l), rhs_(r) {
-		op_->parent_ = this;
+	ExprBinOp(Expr *l, Expr *r) : lhs_(l), rhs_(r) {
 		lhs_->parent_ = this;
 		rhs_->parent_ = this;
 	}
-	const Expr *eval(Context &ctxt) const override;
+	const Expr *eval(Context &ctxt) const {
+		if (ctxt.prev == parent_)
+			return lhs_.get();
+		if (ctxt.prev == lhs_.get())
+			return rhs_.get();
+		auto r = std::move(ctxt.res.back());
+		ctxt.res.pop_back();
+		auto l = std::move(ctxt.res.back());
+		ctxt.res.pop_back();
+		ctxt.res.emplace_back(op_(l, r));
+		return parent_;
+	}
 };
 
+template <typename T>
 struct ExprUnOp : public Expr {
 private:
-	std::unique_ptr<UnOp> op_;
+	T op_;
 	std::unique_ptr<Expr> rhs_;
 public:
-	ExprUnOp(UnOp *o, Expr *r) : op_(o), rhs_(r) {
-		op_->parent_ = this;
+	ExprUnOp(Expr *r) : rhs_(r) {
 		rhs_->parent_ = this;
 	}
-	const Expr *eval(Context &ctxt) const override;
+	const Expr *eval(Context &ctxt) const override {
+		if (ctxt.prev == parent_)
+			return rhs_.get();
+		auto r = std::move(ctxt.res.back());
+		ctxt.res.pop_back();
+		ctxt.res.emplace_back(op_(r));
+		return parent_;
+	}
 };
 
 struct BinOpMul : public BinOp {
-	Value operator() (Value lhs, const Value &rhs) override {
+	Value operator() (Value lhs, const Value &rhs) const {
 		as_int(std::multiplies<int>{}, lhs, rhs);
 		return lhs;
 	}
 };
 struct BinOpDiv : public BinOp {
-	Value operator() (Value lhs, const Value &rhs) override {
+	Value operator() (Value lhs, const Value &rhs) const {
 		as_int(std::divides<int>{}, lhs, rhs);
 		return lhs;
 	}
 };
 struct BinOpMod : public BinOp {
-	Value operator() (Value lhs, const Value &rhs) override {
+	Value operator() (Value lhs, const Value &rhs) const {
 		as_int(std::modulus<int>{}, lhs, rhs);
 		return lhs;
 	}
 };
 struct BinOpPlus : public BinOp {
-	Value operator() (Value lhs, const Value &rhs) override {
+	Value operator() (Value lhs, const Value &rhs) const {
 		as_int(std::plus<int>{}, lhs, rhs);
 		return lhs;
 	}
 };
 struct BinOpMinus : public BinOp {
-	Value operator() (Value lhs, const Value &rhs) override {
+	Value operator() (Value lhs, const Value &rhs) const {
 		as_int(std::minus<int>{}, lhs, rhs);
 		return lhs;
 	}
 };
 struct BinOpLess : public BinOp {
-	Value operator() (Value lhs, const Value &rhs) override {
+	Value operator() (Value lhs, const Value &rhs) const {
 		as_int(std::less<int>{}, lhs, rhs);
 		return lhs;
 	}
 };
 struct BinOpGrtr : public BinOp {
-	Value operator() (Value lhs, const Value &rhs) override {
+	Value operator() (Value lhs, const Value &rhs) const {
 		as_int(std::greater<int>{}, lhs, rhs);
 		return lhs;
 	}
 };
 struct BinOpLessOrEq : public BinOp {
-	Value operator() (Value lhs, const Value &rhs) override {
+	Value operator() (Value lhs, const Value &rhs) const {
 		as_int(std::less_equal<int>{}, lhs, rhs);
 		return lhs;
 	}
 };
 struct BinOpGrtrOrEq : public BinOp {
-	Value operator() (Value lhs, const Value &rhs) override {
+	Value operator() (Value lhs, const Value &rhs) const {
 		as_int(std::greater_equal<int>{}, lhs, rhs);
 		return lhs;
 	}
 };
 struct BinOpEqual : public BinOp {
-	Value operator() (Value lhs, const Value &rhs) override {
+	Value operator() (Value lhs, const Value &rhs) const {
 		as_int(std::equal_to<int>{}, lhs, rhs);
 		return lhs;
 	}
 };
 struct BinOpNotEqual : public BinOp {
-	Value operator() (Value lhs, const Value &rhs) override {
+	Value operator() (Value lhs, const Value &rhs) const {
 		as_int(std::not_equal_to<int>{}, lhs, rhs);
 		return lhs;
 	}
 };
 struct BinOpAnd : public BinOp {
-	Value operator() (Value lhs, const Value &rhs) override {
+	Value operator() (Value lhs, const Value &rhs) const {
 		as_int(std::logical_and<int>{}, lhs, rhs);
 		return lhs;
 	}
 };
 struct BinOpOr : public BinOp {
-	Value operator() (Value lhs, const Value &rhs) override {
+	Value operator() (Value lhs, const Value &rhs) const {
 		as_int(std::logical_or<int>{}, lhs, rhs);
 		return lhs;
 	}
 };
 
 struct UnOpPlus : public UnOp {
-	Value operator() (Value val) override {
+	Value operator() (Value val) const {
 		as_int([](int a) { return +a; }, val);
 		return val;
 	}
 };
 struct UnOpMinus : public UnOp {
-	Value operator() (Value val) override {
+	Value operator() (Value val) const {
 		as_int(std::negate<int>{}, val);
 		return val;
 	}
 };
 struct UnOpNot : public UnOp {
-	Value operator() (Value val) override {
+	Value operator() (Value val) const {
 		as_int(std::logical_not<int>{}, val);
 		return val;
 	}
 };
 struct UnOpPrint : public UnOp {
-	Value operator() (Value val) override {
+	Value operator() (Value val) const {
 		as_int([](int a) {std::cout << a << std::endl; return a; }, val);
 		return val;
 	}
