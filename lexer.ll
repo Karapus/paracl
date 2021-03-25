@@ -25,6 +25,9 @@ id	[a-zA-Z_][a-zA-Z_0-9]*
 "-"		return yy::parser::token::TOK_MINUS;
 "*"		return yy::parser::token::TOK_STAR;
 "/"		return yy::parser::token::TOK_SLASH;
+"%"		return yy::parser::token::TOK_PERCNT;
+"&&"		return yy::parser::token::TOK_AND;
+"||"		return yy::parser::token::TOK_OR;
 "=="		return yy::parser::token::TOK_EQ;
 "!="		return yy::parser::token::TOK_NEQ;
 "<="		return yy::parser::token::TOK_LE;

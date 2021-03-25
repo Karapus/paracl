@@ -25,6 +25,7 @@ INode *makeExprUnop(INode *unop, INode *expr);
 
 INode *makeBinOpMul();
 INode *makeBinOpDiv();
+INode *makeBinOpMod();
 INode *makeBinOpPlus();
 INode *makeBinOpMinus();
 INode *makeBinOpLess();
@@ -33,6 +34,8 @@ INode *makeBinOpLessOrEq();
 INode *makeBinOpGrtrOrEq();
 INode *makeBinOpEqual();
 INode *makeBinOpNotEqual();
+INode *makeBinOpAnd();
+INode *makeBinOpOr();
 
 INode *makeUnOpPlus();
 INode *makeUnOpMinus();

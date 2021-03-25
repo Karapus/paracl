@@ -52,6 +52,10 @@ INode *AST::makeBinOpDiv() {
 	 return new BinOpDiv{};
 }
 
+INode *AST::makeBinOpMod() {
+	 return new BinOpMod{};
+}
+
 INode *AST::makeBinOpPlus() {
 	 return new BinOpPlus{};
 }
@@ -82,6 +86,14 @@ INode *AST::makeBinOpEqual() {
 
 INode *AST::makeBinOpNotEqual() {
 	 return new BinOpNotEqual{};
+}
+
+INode *AST::makeBinOpAnd() {
+	 return new BinOpAnd{};
+}
+
+INode *AST::makeBinOpOr() {
+	 return new BinOpOr{};
 }
 
 INode *AST::makeUnOpPlus() {

@@ -367,10 +367,15 @@ struct BinOpMul : public BinOp {
 		return lhs;
 	}
 };
-
 struct BinOpDiv : public BinOp {
 	Value operator() (Value lhs, const Value &rhs) override {
 		as_int(std::divides<int>{}, lhs, rhs);
+		return lhs;
+	}
+};
+struct BinOpMod : public BinOp {
+	Value operator() (Value lhs, const Value &rhs) override {
+		as_int(std::modulus<int>{}, lhs, rhs);
 		return lhs;
 	}
 };
@@ -419,6 +424,18 @@ struct BinOpEqual : public BinOp {
 struct BinOpNotEqual : public BinOp {
 	Value operator() (Value lhs, const Value &rhs) override {
 		as_int(std::not_equal_to<int>{}, lhs, rhs);
+		return lhs;
+	}
+};
+struct BinOpAnd : public BinOp {
+	Value operator() (Value lhs, const Value &rhs) override {
+		as_int(std::logical_and<int>{}, lhs, rhs);
+		return lhs;
+	}
+};
+struct BinOpOr : public BinOp {
+	Value operator() (Value lhs, const Value &rhs) override {
+		as_int(std::logical_or<int>{}, lhs, rhs);
 		return lhs;
 	}
 };

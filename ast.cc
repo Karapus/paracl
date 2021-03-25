@@ -9,6 +9,7 @@ namespace AST {
 void exec(const INode *root) {
 	auto expr = static_cast<const Expr *>(root);
 	Context ctxt;
+	ctxt.call_stack.emplace_back();
 	try {
 		while (expr) {
 			auto tmp = expr->eval(ctxt);
@@ -16,6 +17,8 @@ void exec(const INode *root) {
 			expr = tmp;
 		}
 		assert(ctxt.res.size() == 1);
+		assert(ctxt.call_stack.size() == 1);
+		assert(ctxt.ctxts_stack.size() == 0);
 	} catch (const std::logic_error& err) {
 		std::cout << "Semantic error: " << err.what() << std::endl;
 	} catch (const std::bad_alloc& ba) {
@@ -29,13 +32,14 @@ const Expr *Empty::eval(Context &ctxt) const {
 }
 
 const Expr *Scope::eval(Context &ctxt) const {
-	if (ctxt.prev == blocks) {
-		if (blocks)
-			ctxt.scope_stack.pop_back();
+	if (ctxt.call_stack.back() == static_cast<const Expr *>(this)) {
+		ctxt.scope_stack.pop_back();
+		ctxt.call_stack.pop_back();
 		return parent_;
 	}
 	if (blocks) {
 		ctxt.scope_stack.emplace_back();
+		ctxt.call_stack.push_back(this);
 		return blocks;
 	}
 	ctxt.res.emplace_back();
@@ -114,7 +118,7 @@ const Expr *Return::eval(Context &ctxt) const {
 		return expr_.get();
 	if (ctxt.call_stack.empty())
 		throw std::logic_error("Return without call");
-	return ctxt.call_stack.back().first;
+	return ctxt.call_stack.back();
 }
 
 const Expr *ExprFunc::eval(Context &ctxt) const {
@@ -124,7 +128,7 @@ const Expr *ExprFunc::eval(Context &ctxt) const {
 			ctxt.scope_stack.front()[id_->name_] = ctxt.res.back();
 		return parent_;
 	}
-	return ctxt.call_stack.back().first;
+	return ctxt.call_stack.back();
 }
 
 const Expr *ExprApply::eval(Context &ctxt) const {
@@ -136,12 +140,13 @@ const Expr *ExprApply::eval(Context &ctxt) const {
 	if (ctxt.prev == ops_.get())
 		return id_.get();
 	if (ctxt.prev == id_.get()) {
+		ctxt.ctxts_stack.emplace_back(std::move(ctxt.scope_stack));
+		ctxt.scope_stack = {ctxt.ctxts_stack.back().front(), VarsT{}};	//only the global scope and func scope
+		ctxt.call_stack.emplace_back(this);
 		Func func = ctxt.res.back();
 		ctxt.res.pop_back();
 		if ((ops_ ? ops_->size() : 0) != func.decls_->size())
 			throw std::logic_error("Incorrect number of arguments");
-		ctxt.call_stack.emplace_back(this, std::move(ctxt.scope_stack));
-		ctxt.scope_stack = {ctxt.call_stack.back().second.front(), VarsT{}};	//emplace only the global scope and func scope
 		auto &&func_scope = ctxt.scope_stack.back();
 		auto res_it = ctxt.res.rbegin();
 		for (auto it = func.decls_->cbegin(), end = func.decls_->cend(); it != end; ++it)
@@ -149,8 +154,9 @@ const Expr *ExprApply::eval(Context &ctxt) const {
 		ctxt.res.erase(res_it.base(), ctxt.res.end());
 		return func.body_;
 	}
-	ctxt.call_stack.back().second.front() = std::move(ctxt.scope_stack.front());
-	ctxt.scope_stack = std::move(ctxt.call_stack.back().second);
+	ctxt.ctxts_stack.back().front() = std::move(ctxt.scope_stack.front());
+	ctxt.scope_stack = std::move(ctxt.ctxts_stack.back());
+	ctxt.ctxts_stack.pop_back();
 	ctxt.call_stack.pop_back();
 	return parent_;
 }
