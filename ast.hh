@@ -1,4 +1,5 @@
 #pragma once
+#include <bits/c++config.h>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -44,6 +45,9 @@ struct IValue {
 		throw IncorrectTypeExcept{};
 	}
 	virtual IValue *clone() const = 0;
+	virtual void free() {
+		delete this;
+	}
 	virtual ~IValue() = default;
 };
 
@@ -60,8 +64,8 @@ public:
 	IntValue *clone() const override {
 		return new IntValue(val_);
 	}
-	IntValue(int val) : val_(val)
-	{}
+	IntValue(int val) : val_(val) {
+	}
 };
 
 
@@ -78,31 +82,42 @@ public:
 	FuncValue *clone() const override {
 		return new FuncValue(func_);
 	}
-	FuncValue(Func f) : func_(f)
-	{}
+	FuncValue(Func f)  : func_(f) {
+	}
 };
 
 struct DefaultValue : public IValue {
+private:
+	DefaultValue() = default;
+public:
 	DefaultValue *clone() const override {
-		return new DefaultValue{};
+		return instance();
 	}
+	void free() override {
+	}
+	static DefaultValue *instance() {
+		static auto val_ = new DefaultValue{};
+		return val_;
+	}
+	DefaultValue(const DefaultValue &) = delete;
+	DefaultValue &operator = (const DefaultValue &) = delete;
 };
 
 struct Value {
 private:
 	IValue *ptr_;
 public:
-	Value() : ptr_(new DefaultValue{}) {
+	Value() : ptr_(DefaultValue::instance()) {
 	}
 	Value(const Value &rhs) : ptr_(rhs.ptr_->clone()) {
 	}
 	Value(Value &&rhs) noexcept {
 		ptr_ = rhs.ptr_;
-		rhs.ptr_ = nullptr;
+		rhs.ptr_ = DefaultValue::instance();
 	}
 	Value &operator = (const Value &rhs) {
 		if (this != &rhs) {
-			delete ptr_;
+			ptr_->free();
 			ptr_ = rhs.ptr_->clone();
 		}
 		return *this;
@@ -111,9 +126,9 @@ public:
 		std::swap(ptr_, rhs.ptr_);
 		return *this;
 	}
-	Value(int val) : ptr_(new IntValue(val)) {
+	explicit Value(int val) : ptr_(new IntValue(val)) {
 	}
-	Value(Func val) : ptr_(new FuncValue(val)) {
+	explicit Value(Func val) : ptr_(new FuncValue(val)) {
 	}
 	operator int&() & {
 		return static_cast<int &>(*ptr_);
@@ -129,15 +144,14 @@ public:
 		return static_cast<int>(*ptr_);
 	}
 	~Value() {
-		delete ptr_;
+		ptr_->free();
 	}
 };
 
 using VarsT = std::unordered_map<std::string, Value>;
 
 struct INode {
-	virtual ~INode()
-	{}
+	virtual ~INode() = default;
 };
 
 struct Expr;
@@ -160,14 +174,14 @@ struct Expr : public Node, public INode {
 	virtual const Expr *eval(Context &ctxt) const = 0;
 };
 
-struct BinOp : public Node, public INode {
+struct BinOp {
 	template <typename F>
 	void as_int(F functor, int &lhs, int rhs) const {
 		lhs = functor(lhs, rhs);
 	}
 };
 
-struct UnOp : public Node, public INode {
+struct UnOp {
 	template <typename F>
 	void as_int(F functor, int &val) const {
 		val = functor(val);
@@ -180,9 +194,7 @@ private:
 	std::unique_ptr<Expr> block_;
 public:
 	BlockList(BlockList *blocks, Expr *block) : blocks_(blocks), block_(block) {
-		block_->parent_ = this;
-		if (blocks_)
-			blocks_->parent_ = this;
+		block_->parent_ = blocks_->parent_ = this;
 	}
 	const Expr *eval(Context &ctxt) const override;
 };
@@ -227,14 +239,10 @@ struct Empty : public Expr {
 
 struct Scope : public Expr {
 private:
-	BlockList *blocks;
+	std::unique_ptr<BlockList> blocks;
 public:
 	Scope(BlockList *b) : blocks(b) {
-		if (blocks)
-			blocks->parent_ = this;
-	}
-	~Scope() {
-		delete blocks;
+		blocks->parent_ = this;
 	}
 	const Expr *eval(Context &ctxt) const override; 
 };
@@ -245,8 +253,7 @@ private:
 	std::unique_ptr<Expr> snd_;
 public:
 	Seq(Expr *fst, Expr *snd) : fst_(fst), snd_(snd) {
-		fst_->parent_ = this;
-		snd_->parent_ = this;
+		fst_->parent_ = snd_->parent_ = this;
 	}
 	const Expr *eval(Context &ctxt) const override; 
 };
@@ -327,8 +334,7 @@ private:
 	std::unique_ptr<Expr> expr_;
 public:
 	ExprAssign(ExprId *i, Expr *e) : id_(i), expr_(e) {
-		id_->parent_ = this;
-		expr_->parent_ = this;
+		id_->parent_ = expr_->parent_ = this;
 	}
 	const Expr *eval(Context &ctxt) const override;
 };
@@ -354,8 +360,7 @@ private:
 	std::unique_ptr<Expr> rhs_;
 public:
 	ExprBinOp(Expr *l, Expr *r) : lhs_(l), rhs_(r) {
-		lhs_->parent_ = this;
-		rhs_->parent_ = this;
+		lhs_->parent_ = rhs_->parent_ = this;
 	}
 	const Expr *eval(Context &ctxt) const {
 		if (ctxt.prev == parent_)

@@ -40,7 +40,7 @@ const Expr *Scope::eval(Context &ctxt) const {
 	if (blocks) {
 		ctxt.scope_stack.emplace_back();
 		ctxt.call_stack.push_back(this);
-		return blocks;
+		return blocks.get();
 	}
 	ctxt.res.emplace_back();
 	return parent_;
