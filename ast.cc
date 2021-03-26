@@ -1,8 +1,5 @@
 #include "ast.hh"
 #include <cassert>
-#include <iostream>
-#include <new>
-#include <stdexcept>
 
 namespace AST {
 
@@ -121,7 +118,7 @@ const Expr *Return::eval(Context &ctxt) const {
 
 const Expr *ExprFunc::eval(Context &ctxt) const {
 	if (ctxt.prev == parent_) {
-		ctxt.res.emplace_back(Func{*const_cast<ExprFunc *>(this)});
+		ctxt.res.emplace_back(Func{body_.get(), decls_.get()});
 		if (id_)
 			ctxt.scope_stack.front()[id_->name_] = ctxt.res.back();
 		return parent_;

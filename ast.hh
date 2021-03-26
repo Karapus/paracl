@@ -1,6 +1,5 @@
 #pragma once
-#include <bits/c++config.h>
-#include <stdexcept>
+#include "value.hh"
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -9,144 +8,6 @@
 #include <iostream>
 
 namespace AST {
-
-struct Func;
-struct ExprFunc;
-struct Value;
-struct Scope;
-struct DeclList;
-struct ExprList;
-struct Context;
-
-struct IncorrectTypeExcept : public std::logic_error {
-	IncorrectTypeExcept() : std::logic_error("Incorrect Type") {
-	}
-};
-
-struct Func {
-	const Scope *body_;
-	const DeclList *decls_;
-	Func(const Scope *body, const DeclList *decls_) : body_(body), decls_(decls_) {
-	}
-};
-
-
-struct IValue {
-	virtual operator int() const {
-		throw IncorrectTypeExcept{};
-	}
-	virtual operator int&() & {
-		throw IncorrectTypeExcept{};
-	}
-	virtual operator Func() const {
-		throw IncorrectTypeExcept{};
-	}
-	virtual operator Func&() & {
-		throw IncorrectTypeExcept{};
-	}
-	virtual IValue *clone() const = 0;
-	virtual void free() {
-		delete this;
-	}
-	virtual ~IValue() = default;
-};
-
-struct IntValue : public IValue {
-private:
-	int val_;
-public:
-	operator int() const override {
-		return val_;
-	}
-	operator int&() & override {
-		return val_;
-	}
-	IntValue *clone() const override {
-		return new IntValue(val_);
-	}
-	IntValue(int val) : val_(val) {
-	}
-};
-
-
-struct FuncValue : public IValue {
-private:
-	Func func_;
-public:
-	operator Func() const override {
-		return func_;
-	}
-	operator Func&() & override {
-		return func_;
-	}
-	FuncValue *clone() const override {
-		return new FuncValue(func_);
-	}
-	FuncValue(Func f)  : func_(f) {
-	}
-};
-
-struct DefaultValue : public IValue {
-private:
-	DefaultValue() = default;
-public:
-	DefaultValue *clone() const override {
-		return instance();
-	}
-	void free() override {
-	}
-	static DefaultValue *instance() {
-		static auto val_ = new DefaultValue{};
-		return val_;
-	}
-	DefaultValue(const DefaultValue &) = delete;
-	DefaultValue &operator = (const DefaultValue &) = delete;
-};
-
-struct Value {
-private:
-	IValue *ptr_;
-public:
-	Value() : ptr_(DefaultValue::instance()) {
-	}
-	Value(const Value &rhs) : ptr_(rhs.ptr_->clone()) {
-	}
-	Value(Value &&rhs) noexcept {
-		ptr_ = rhs.ptr_;
-		rhs.ptr_ = DefaultValue::instance();
-	}
-	Value &operator = (const Value &rhs) {
-		if (this != &rhs) {
-			ptr_->free();
-			ptr_ = rhs.ptr_->clone();
-		}
-		return *this;
-	}
-	Value &operator = (Value &&rhs) noexcept {
-		std::swap(ptr_, rhs.ptr_);
-		return *this;
-	}
-	explicit Value(int val) : ptr_(new IntValue(val)) {
-	}
-	explicit Value(Func val) : ptr_(new FuncValue(val)) {
-	}
-	operator int&() & {
-		return static_cast<int &>(*ptr_);
-	}
-	operator Func&() & {
-		return static_cast<Func &>(*ptr_);
-	}
-	template <typename T>
-	operator T() const {
-		return static_cast<T>(*ptr_);
-	}
-	operator bool() const {
-		return static_cast<int>(*ptr_);
-	}
-	~Value() {
-		ptr_->free();
-	}
-};
 
 using VarsT = std::unordered_map<std::string, Value>;
 
@@ -319,9 +180,6 @@ public:
 	ExprFunc(Scope *b, DeclList *d, ExprId *i = nullptr) : body_(b), decls_(d), id_(i) {
 		body_->parent_ = this;
 	}
-	operator Func() {
-		return Func{body_.get(), decls_.get()};
-	}
 	const Expr *eval(Context &ctxt) const override;
 };
 
@@ -367,11 +225,10 @@ public:
 			return lhs_.get();
 		if (ctxt.prev == lhs_.get())
 			return rhs_.get();
-		auto r = std::move(ctxt.res.back());
+		auto &&r = std::move(ctxt.res.back());
 		ctxt.res.pop_back();
-		auto l = std::move(ctxt.res.back());
-		ctxt.res.pop_back();
-		ctxt.res.emplace_back(op_(l, r));
+		auto &&l = std::move(ctxt.res.back());
+		ctxt.res.back() = op_(l, r);
 		return parent_;
 	}
 };
@@ -388,9 +245,7 @@ public:
 	const Expr *eval(Context &ctxt) const override {
 		if (ctxt.prev == parent_)
 			return rhs_.get();
-		auto r = std::move(ctxt.res.back());
-		ctxt.res.pop_back();
-		ctxt.res.emplace_back(op_(r));
+		ctxt.res.back() = op_(std::move(ctxt.res.back()));
 		return parent_;
 	}
 };
