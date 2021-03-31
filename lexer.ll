@@ -8,6 +8,7 @@
 	#define YY_TERMINATE return 
 %}
 %option yyclass="yy::Lexer"
+%x comment
 
 wc	[ \t\r]
 num	([1-9][0-9]*)|"0"
@@ -20,7 +21,12 @@ id	[a-zA-Z_][a-zA-Z_0-9]*
 %}
 
 {wc}+	yyloc->step();
-\n+	yyloc->lines(YYLeng()); yyloc->step();
+
+"//"		BEGIN(comment);
+<comment>[^\n]*
+<comment>\n	BEGIN(INITIAL); yyloc->lines();
+
+\n+		yyloc->lines(YYLeng()); yyloc->step();
 "+"		return yy::parser::token::TOK_PLUS;
 "-"		return yy::parser::token::TOK_MINUS;
 "*"		return yy::parser::token::TOK_STAR;
