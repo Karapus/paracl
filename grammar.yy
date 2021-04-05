@@ -91,29 +91,31 @@ block	: stm			{ $$ = $1;	}
         | error 		{ $$ = make<Empty>(@$);	}
 ;
 
-stm	: scope						{ $$ = $1; }
-	| WHILE LPAR expr RPAR block			{ $$ = make<While>(@$, $3, $5);	}
+stm	: scope						{ $$ = $1;	}
+	| WHILE LPAR expr RPAR block			{ $$ = make<While>(@$, $3, $5);		}
 	| IF LPAR expr RPAR block ELSE block		{ $$ = make<If>(@$, $3, $5, $7);	}
 	| IF LPAR expr RPAR block	%prec THEN	{ $$ = make<If>(@$, $3, $5);		}
 	| ID ASSIGN func		 		{ $$ = make<ExprAssign>(@$, $1, $3);	}
 ;
 
-cexpr	: LPAR expr RPAR	{ $$ = $2; 	}
+cexpr	: LPAR aexpr RPAR	{ $$ = $2; 	}
 	| NUM			{ $$ = $1;	}
 	| ID			{ $$ = $1;	}
 	| QMARK			{ $$ = make<ExprQmark>(@$);			}
-	| ID ASSIGN expr	{ $$ = make<ExprAssign>(@$, $1, $3);		}
-	| ID applist		{ $$ = make<ExprApply>(@$, $1, $2);		}
 	| RETURN expr		{ $$ = make<Return>(@$, $2);			}
-	| PRINT expr		{ $$ = make<ExprUnOp<UnOpPrint>>(@$, $2);	}
+	| ID applist		{ $$ = make<ExprApply>(@$, $1, $2);		}
+	| PRINT expr		{ $$ = make<ExprUnOp<UnOpPrint	>>(@$, $2);	}
 	| PLUS	expr %prec UNOP	{ $$ = make<ExprUnOp<UnOpPlus	>>(@$, $2);	}
-	| MINUS	expr %prec UNOP	{ $$ = make<ExprUnOp<UnOpMinus>>(@$, $2);	}
+	| MINUS	expr %prec UNOP	{ $$ = make<ExprUnOp<UnOpMinus	>>(@$, $2);	}
 	| EXCL	expr %prec UNOP	{ $$ = make<ExprUnOp<UnOpNot	>>(@$, $2);	}
 ;
 
+aexpr	: ID ASSIGN aexpr	{ $$ = make<ExprAssign>(@$, $1, $3);	}
+	| expr	 %prec ASSIGN	{ $$ = $1;	}
 ;
 
-fexpr	: cexpr			{ $$ = $1; }
+fexpr	: cexpr			{ $$ = $1;	}
+	| ID ASSIGN aexpr	{ $$ = make<ExprAssign>(@$, $1, $3);	}
 	| fexpr PLUS	expr	{ $$ = make<ExprBinOp<BinOpPlus		>>(@$, $1, $3);	}
 	| fexpr MINUS	expr	{ $$ = make<ExprBinOp<BinOpMinus	>>(@$, $1, $3);	}
 	| fexpr STAR	expr	{ $$ = make<ExprBinOp<BinOpMul		>>(@$, $1, $3);	}
