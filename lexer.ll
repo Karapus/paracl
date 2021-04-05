@@ -57,11 +57,11 @@ id	[a-zA-Z_][a-zA-Z_0-9]*
 ":"		return yy::parser::token::TOK_COLON;
 ","		return yy::parser::token::TOK_COMA;
 {num}	{
-		*yylval = AST::makeExprInt(std::stoi(YYText()));
+		*yylval = AST::make<AST::ExprInt>(*yyloc, std::stoi(YYText()));
 		return yy::parser::token::TOK_NUM;
 	}
 {id}	{
-		*yylval = AST::makeExprId(YYText());
+		*yylval = AST::make<AST::ExprId>(*yyloc, YYText());
 		return yy::parser::token::TOK_ID;
 	}
 .	throw yy::parser::syntax_error(*yyloc, "invalid character: " + std::string(YYText()));

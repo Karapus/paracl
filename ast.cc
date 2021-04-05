@@ -1,4 +1,5 @@
 #include "ast.hh"
+#include "value.hh"
 #include <cassert>
 
 namespace AST {
@@ -16,6 +17,8 @@ void exec(const INode *root) {
 		assert(ctxt.res.size() == 1);
 		assert(ctxt.call_stack.size() == 1);
 		assert(ctxt.ctxts_stack.size() == 0);
+	} catch (const Values::ValueExcept& err) {
+		std::cout << "Type error: " << err << " is used at " << expr->loc_ << std::endl;
 	} catch (const std::logic_error& err) {
 		std::cout << "Semantic error: " << err.what() << std::endl;
 	} catch (const std::bad_alloc& ba) {
@@ -34,10 +37,10 @@ const Expr *Scope::eval(Context &ctxt) const {
 		ctxt.call_stack.pop_back();
 		return parent_;
 	}
-	if (blocks) {
+	if (blocks_) {
 		ctxt.scope_stack.emplace_back();
 		ctxt.call_stack.push_back(this);
-		return blocks.get();
+		return blocks_.get();
 	}
 	ctxt.res.emplace_back();
 	return parent_;
@@ -84,7 +87,7 @@ const Expr *If::eval(Context &ctxt) const {
 }
 
 const Expr *ExprInt::eval(Context &ctxt) const {
-	ctxt.res.emplace_back(val_);
+	ctxt.res.emplace_back(loc_, val_);
 	return parent_;
 }
 
@@ -118,7 +121,7 @@ const Expr *Return::eval(Context &ctxt) const {
 
 const Expr *ExprFunc::eval(Context &ctxt) const {
 	if (ctxt.prev == parent_) {
-		ctxt.res.emplace_back(Func{body_.get(), decls_.get()});
+		ctxt.res.emplace_back(loc_, Func{body_.get(), decls_.get()});
 		if (id_)
 			ctxt.scope_stack.front()[id_->name_] = ctxt.res.back();
 		return parent_;
@@ -161,7 +164,7 @@ const Expr *ExprApply::eval(Context &ctxt) const {
 const Expr *ExprQmark::eval(Context &ctxt) const {
 	int val;
 	std::cin >> val;
-	ctxt.res.emplace_back(val);
+	ctxt.res.emplace_back(loc_, val);
 	return parent_;
 }
 

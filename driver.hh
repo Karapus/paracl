@@ -14,7 +14,7 @@ struct Driver final {
 		yy::parser parser{*this};
 		if (parser())
 			return nullptr;
-		return static_cast<AST::INode *>(yylval);
+		return yylval;
 	}
 };
 }

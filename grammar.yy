@@ -17,6 +17,7 @@
 	#include "driver.hh"
 	#undef	yylex
 	#define	yylex driver.lexer.yylex
+	using namespace AST;
 }
 
 %define parse.trace
@@ -74,95 +75,95 @@
 
 %start program
 %%
-program : blocks END	{ driver.yylval = AST::makeScope($1);	}
+program : blocks END	{ driver.yylval = make<Scope>(@$, $1);	}
 ;
 
-scope   : LBRACE blocks RBRACE 	{ $$ = AST::makeScope($2);	}
+scope   : LBRACE blocks RBRACE 	{ $$ = make<Scope>(@$, $2);	}
 ;
 
-blocks	: blocks block		{ $$ = AST::makeSeq($1, $2);	}
-	| %empty		{ $$ = AST::makeEmpty();		}
+blocks	: blocks block		{ $$ = make<Seq>(@$, $1, $2);	}
+	| %empty		{ $$ = make<Empty>(@$);		}
 ;
 
 block	: stm			{ $$ = $1;	}
 	| fexpr SEMICOLON	{ $$ = $1;	}
-	| SEMICOLON		{ $$ = AST::makeEmpty();	}
-        | error 		{ $$ = AST::makeEmpty();	}
+	| SEMICOLON		{ $$ = make<Empty>(@$);	}
+        | error 		{ $$ = make<Empty>(@$);	}
 ;
 
 stm	: scope						{ $$ = $1; }
-	| WHILE LPAR expr RPAR block			{ $$ = AST::makeWhile($3, $5);	}
-	| IF LPAR expr RPAR block ELSE block		{ $$ = AST::makeIf($3, $5, $7);	}
-	| IF LPAR expr RPAR block	%prec THEN	{ $$ = AST::makeIf($3, $5);	}
-	| ID ASSIGN func		 		{ $$ = AST::makeExprAssign($1, $3);	}
+	| WHILE LPAR expr RPAR block			{ $$ = make<While>(@$, $3, $5);	}
+	| IF LPAR expr RPAR block ELSE block		{ $$ = make<If>(@$, $3, $5, $7);	}
+	| IF LPAR expr RPAR block	%prec THEN	{ $$ = make<If>(@$, $3, $5);		}
+	| ID ASSIGN func		 		{ $$ = make<ExprAssign>(@$, $1, $3);	}
 ;
 
 cexpr	: LPAR expr RPAR	{ $$ = $2; 	}
 	| NUM			{ $$ = $1;	}
 	| ID			{ $$ = $1;	}
-	| QMARK			{ $$ = AST::makeExprQmark();		}
-	| ID ASSIGN expr	{ $$ = AST::makeExprAssign($1, $3);	}
-	| ID applist		{ $$ = AST::makeExprApply($1, $2);	}
-	| RETURN expr		{ $$ = AST::makeReturn($2);		}
-	| PRINT expr		{ $$ = AST::makeExprUnop<AST::UnOpPrint	>($2);	}
-	| PLUS	expr %prec UNOP	{ $$ = AST::makeExprUnop<AST::UnOpPlus	>($2);	}
-	| MINUS	expr %prec UNOP	{ $$ = AST::makeExprUnop<AST::UnOpMinus	>($2);	}
-	| EXCL	expr %prec UNOP	{ $$ = AST::makeExprUnop<AST::UnOpNot	>($2);	}
+	| QMARK			{ $$ = make<ExprQmark>(@$);			}
+	| ID ASSIGN expr	{ $$ = make<ExprAssign>(@$, $1, $3);		}
+	| ID applist		{ $$ = make<ExprApply>(@$, $1, $2);		}
+	| RETURN expr		{ $$ = make<Return>(@$, $2);			}
+	| PRINT expr		{ $$ = make<ExprUnOp<UnOpPrint>>(@$, $2);	}
+	| PLUS	expr %prec UNOP	{ $$ = make<ExprUnOp<UnOpPlus	>>(@$, $2);	}
+	| MINUS	expr %prec UNOP	{ $$ = make<ExprUnOp<UnOpMinus>>(@$, $2);	}
+	| EXCL	expr %prec UNOP	{ $$ = make<ExprUnOp<UnOpNot	>>(@$, $2);	}
 ;
 
 ;
 
-fexpr	: cexpr		{$$ = $1; }
-	| fexpr PLUS	expr	{ $$ = AST::makeExprBinop<AST::BinOpPlus	>($1, $3);	}
-	| fexpr MINUS	expr	{ $$ = AST::makeExprBinop<AST::BinOpMinus	>($1, $3);	}
-	| fexpr STAR	expr	{ $$ = AST::makeExprBinop<AST::BinOpMul		>($1, $3);	}
-	| fexpr SLASH	expr	{ $$ = AST::makeExprBinop<AST::BinOpDiv		>($1, $3);	}
-	| fexpr PERCNT	expr	{ $$ = AST::makeExprBinop<AST::BinOpMod		>($1, $3);	}
-	| fexpr LT	expr	{ $$ = AST::makeExprBinop<AST::BinOpLess	>($1, $3);	}
-	| fexpr GT	expr	{ $$ = AST::makeExprBinop<AST::BinOpGrtr	>($1, $3);	}
-	| fexpr LE	expr	{ $$ = AST::makeExprBinop<AST::BinOpLessOrEq	>($1, $3);	}
-	| fexpr GE	expr	{ $$ = AST::makeExprBinop<AST::BinOpGrtrOrEq	>($1, $3);	}
-	| fexpr EQ	expr	{ $$ = AST::makeExprBinop<AST::BinOpEqual	>($1, $3);	}
-	| fexpr NEQ	expr	{ $$ = AST::makeExprBinop<AST::BinOpNotEqual	>($1, $3);	}
-	| fexpr AND	expr	{ $$ = AST::makeExprBinop<AST::BinOpAnd		>($1, $3);	}
-	| fexpr OR	expr	{ $$ = AST::makeExprBinop<AST::BinOpOr		>($1, $3);	}
+fexpr	: cexpr			{ $$ = $1; }
+	| fexpr PLUS	expr	{ $$ = make<ExprBinOp<BinOpPlus		>>(@$, $1, $3);	}
+	| fexpr MINUS	expr	{ $$ = make<ExprBinOp<BinOpMinus	>>(@$, $1, $3);	}
+	| fexpr STAR	expr	{ $$ = make<ExprBinOp<BinOpMul		>>(@$, $1, $3);	}
+	| fexpr SLASH	expr	{ $$ = make<ExprBinOp<BinOpDiv		>>(@$, $1, $3);	}
+	| fexpr PERCNT	expr	{ $$ = make<ExprBinOp<BinOpMod		>>(@$, $1, $3);	}
+	| fexpr LT	expr	{ $$ = make<ExprBinOp<BinOpLess		>>(@$, $1, $3);	}
+	| fexpr GT	expr	{ $$ = make<ExprBinOp<BinOpGrtr		>>(@$, $1, $3);	}
+	| fexpr LE	expr	{ $$ = make<ExprBinOp<BinOpLessOrEq	>>(@$, $1, $3);	}
+	| fexpr GE	expr	{ $$ = make<ExprBinOp<BinOpGrtrOrEq	>>(@$, $1, $3);	}
+	| fexpr EQ	expr	{ $$ = make<ExprBinOp<BinOpEqual	>>(@$, $1, $3);	}
+	| fexpr NEQ	expr	{ $$ = make<ExprBinOp<BinOpNotEqual	>>(@$, $1, $3);	}
+	| fexpr AND	expr	{ $$ = make<ExprBinOp<BinOpAnd		>>(@$, $1, $3);	}
+	| fexpr OR	expr	{ $$ = make<ExprBinOp<BinOpOr		>>(@$, $1, $3);	}
 ;
 
-expr	: cexpr 	{ $$ = $1;	}
-	| stm		{ $$ = $1;	}
-	| expr PLUS	expr	{ $$ = AST::makeExprBinop<AST::BinOpPlus	>($1, $3);	}
-	| expr MINUS	expr	{ $$ = AST::makeExprBinop<AST::BinOpMinus	>($1, $3);	}
-	| expr STAR	expr	{ $$ = AST::makeExprBinop<AST::BinOpMul		>($1, $3);	}
-	| expr SLASH	expr	{ $$ = AST::makeExprBinop<AST::BinOpDiv		>($1, $3);	}
-	| expr PERCNT	expr	{ $$ = AST::makeExprBinop<AST::BinOpMod		>($1, $3);	}
-	| expr LT	expr	{ $$ = AST::makeExprBinop<AST::BinOpLess	>($1, $3);	}
-	| expr GT	expr	{ $$ = AST::makeExprBinop<AST::BinOpGrtr	>($1, $3);	}
-	| expr LE	expr	{ $$ = AST::makeExprBinop<AST::BinOpLessOrEq	>($1, $3);	}
-	| expr GE	expr	{ $$ = AST::makeExprBinop<AST::BinOpGrtrOrEq	>($1, $3);	}
-	| expr EQ	expr	{ $$ = AST::makeExprBinop<AST::BinOpEqual	>($1, $3);	}
-	| expr NEQ	expr	{ $$ = AST::makeExprBinop<AST::BinOpNotEqual	>($1, $3);	}
-	| expr AND	expr	{ $$ = AST::makeExprBinop<AST::BinOpAnd		>($1, $3);	}
-	| expr OR	expr	{ $$ = AST::makeExprBinop<AST::BinOpOr		>($1, $3);	}
+expr	: cexpr 		{ $$ = $1;	}
+	| stm			{ $$ = $1;	}
+	| expr PLUS	expr	{ $$ = make<ExprBinOp<BinOpPlus>>	(@$, $1, $3);	}
+	| expr MINUS	expr	{ $$ = make<ExprBinOp<BinOpMinus>>	(@$, $1, $3);	}
+	| expr STAR	expr	{ $$ = make<ExprBinOp<BinOpMul>>	(@$, $1, $3);	}
+	| expr SLASH	expr	{ $$ = make<ExprBinOp<BinOpDiv>>	(@$, $1, $3);	}
+	| expr PERCNT	expr	{ $$ = make<ExprBinOp<BinOpMod>>	(@$, $1, $3);	}
+	| expr LT	expr	{ $$ = make<ExprBinOp<BinOpLess>>	(@$, $1, $3);	}
+	| expr GT	expr	{ $$ = make<ExprBinOp<BinOpGrtr>>	(@$, $1, $3);	}
+	| expr LE	expr	{ $$ = make<ExprBinOp<BinOpLessOrEq>>	(@$, $1, $3);	}
+	| expr GE	expr	{ $$ = make<ExprBinOp<BinOpGrtrOrEq>>	(@$, $1, $3);	}
+	| expr EQ	expr	{ $$ = make<ExprBinOp<BinOpEqual>>	(@$, $1, $3);	}
+	| expr NEQ	expr	{ $$ = make<ExprBinOp<BinOpNotEqual>>	(@$, $1, $3);	}
+	| expr AND	expr	{ $$ = make<ExprBinOp<BinOpAnd>>	(@$, $1, $3);	}
+	| expr OR	expr	{ $$ = make<ExprBinOp<BinOpOr>>		(@$, $1, $3);	}
 ;
 
-func	: FUNC declist scope		{ $$ = AST::makeExprFunc($3, $2);	}
-	| FUNC declist COLON ID scope	{ $$ = AST::makeExprFunc($5, $2, $4);	}
+func	: FUNC declist scope		{ $$ = make<ExprFunc>(@$, $3, $2);	}
+	| FUNC declist COLON ID scope	{ $$ = make<ExprFunc>(@$, $5, $2, $4);	}
 ;
 
 declist	: LPAR decls RPAR	{ $$ = $2;			}
-	| LPAR RPAR		{ $$ = AST::makeDeclListTerm();	}
+	| LPAR RPAR		{ $$ = make<DeclList>();	}
 ;
 
-decls	: decls COMA ID	{ $$ = AST::makeDeclList($1, $3);			}
-	| ID		{ $$ = AST::makeDeclList(AST::makeDeclListTerm(), $1);	}
+decls	: decls COMA ID	{ $$ = make<DeclList>($1, $3);			}
+	| ID		{ $$ = make<DeclList>(make<DeclList>(), $1);	}
 ;
 
 applist	: LPAR exprs RPAR	{ $$ = $2;			}
-	| LPAR RPAR		{ $$ = AST::makeExprListTerm();	}
+	| LPAR RPAR		{ $$ = make<ExprList>();	}
 ;
 
-exprs	: exprs COMA expr	{ $$ = AST::makeExprList($1, $3);			}
-	| expr			{ $$ = AST::makeExprList(AST::makeExprListTerm(), $1);	}
+exprs	: exprs COMA expr	{ $$ = make<ExprList>(@$, $1, $3);			}
+	| expr			{ $$ = make<ExprList>(@$, make<ExprList>(), $1);	}
 ;
 
 %%

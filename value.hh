@@ -1,8 +1,10 @@
 #pragma once
-#include <stdexcept>
+#include "location.hh"
+#include <ostream>
 
 namespace AST {
 
+using LocT = yy::location;
 struct Scope;
 struct DeclList;
 
@@ -14,24 +16,39 @@ struct Func {
 };
 
 namespace Values {
-struct IncorrectTypeExcept : public std::logic_error {
-	IncorrectTypeExcept() : std::logic_error("Incorrect Type") {
+
+struct ValueExcept {
+	virtual void print(std::ostream& os) const = 0; 
+	virtual ~ValueExcept() = default;
+};
+
+inline std::ostream& operator << (std::ostream& os, const ValueExcept &err) {
+	err.print(os);
+	return os;
+}
+
+struct UdefValExcept : ValueExcept {
+	void print(std::ostream& os) const override {
+		os << "Undefined value";
+	}
+};
+
+struct IncorrectTypeExcept : ValueExcept {
+private:
+	LocT origin_;
+public:
+	void print(std::ostream& os) const override {
+		os << "Value of incorrect type declared at " << origin_;
+	}
+	IncorrectTypeExcept(LocT l) : origin_(l) {
 	}
 };
 
 struct IValue {
-	virtual operator int() const {
-		throw IncorrectTypeExcept{};
-	}
-	virtual operator int&() & {
-		throw IncorrectTypeExcept{};
-	}
-	virtual operator Func() const {
-		throw IncorrectTypeExcept{};
-	}
-	virtual operator Func&() & {
-		throw IncorrectTypeExcept{};
-	}
+	virtual operator int() const = 0;
+	virtual operator int&() & = 0;
+	virtual operator Func() const = 0;
+	virtual operator Func&() & = 0;
 	virtual IValue *clone() const = 0;
 	virtual void free() {
 		delete this;
@@ -41,6 +58,7 @@ struct IValue {
 
 struct IntValue : public IValue {
 private:
+	LocT origin_;
 	int val_;
 public:
 	operator int() const override {
@@ -49,18 +67,31 @@ public:
 	operator int&() & override {
 		return val_;
 	}
-	IntValue *clone() const override {
-		return new IntValue(val_);
+	operator Func() const override {
+		throw IncorrectTypeExcept{origin_};
 	}
-	IntValue(int val) : val_(val) {
+	operator Func&() & override {
+		throw IncorrectTypeExcept{origin_};
+	}
+	IntValue *clone() const override {
+		return new IntValue(origin_, val_);
+	}
+	IntValue(LocT loc, int val) : origin_(loc), val_(val) {
 	}
 };
 
 
 struct FuncValue : public IValue {
 private:
+	LocT origin_;
 	Func func_;
 public:
+	operator int() const override {
+		throw IncorrectTypeExcept{origin_};
+	}
+	operator int&() & override {
+		throw IncorrectTypeExcept{origin_};
+	}
 	operator Func() const override {
 		return func_;
 	}
@@ -68,24 +99,36 @@ public:
 		return func_;
 	}
 	FuncValue *clone() const override {
-		return new FuncValue(func_);
+		return new FuncValue{origin_, func_};
 	}
-	FuncValue(Func f)  : func_(f) {
+	FuncValue(LocT loc, Func f)  : origin_(loc), func_(f) {
 	}
 };
 
 struct DefaultValue : public IValue {
 private:
-	DefaultValue() = default;
+	DefaultValue() = default; 
 public:
+	operator int() const override {
+		throw UdefValExcept{};
+	}
+	operator int&() & override {
+		throw UdefValExcept{};
+	}
+	operator Func() const override {
+		throw UdefValExcept{};
+	}
+	operator Func&() & override {
+		throw UdefValExcept{};
+	}
 	DefaultValue *clone() const override {
 		return instance();
 	}
 	void free() override {
 	}
 	static DefaultValue *instance() {
-		static auto val_ = new DefaultValue{};
-		return val_;
+		static auto val_ = DefaultValue{};
+		return &val_;
 	}
 	DefaultValue(const DefaultValue &) = delete;
 	DefaultValue &operator = (const DefaultValue &) = delete;
@@ -115,9 +158,9 @@ public:
 		std::swap(ptr_, rhs.ptr_);
 		return *this;
 	}
-	explicit Value(int val) : ptr_(new Values::IntValue(val)) {
+	Value(LocT loc, int val) : ptr_(new Values::IntValue(loc, val)) {
 	}
-	explicit Value(Func val) : ptr_(new Values::FuncValue(val)) {
+	Value(LocT loc, Func val) : ptr_(new Values::FuncValue(loc, val)) {
 	}
 	operator int&() & {
 		return static_cast<int &>(*ptr_);

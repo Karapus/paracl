@@ -11,11 +11,13 @@ namespace AST {
 
 using VarsT = std::unordered_map<std::string, Value>;
 
+struct Expr;
+
 struct INode {
+	Expr *parent_ = nullptr;
 	virtual ~INode() = default;
 };
 
-struct Expr;
 
 struct Context {
 	using ScopeStackT = std::vector<VarsT>;
@@ -26,16 +28,15 @@ struct Context {
 	std::vector<Value> res;
 };
 
-struct Node {
-	Expr *parent_ = nullptr;
-	virtual ~Node() = default;
-};
-
-struct Expr : public Node, public INode {
+struct Expr : public INode {
+	LocT loc_;
+	Expr(LocT loc) : loc_(loc) {
+	}
 	virtual const Expr *eval(Context &ctxt) const = 0;
 };
 
 struct BinOp {
+	LocT loc_;
 	template <typename F>
 	void as_int(F functor, int &lhs, int rhs) const {
 		lhs = functor(lhs, rhs);
@@ -43,21 +44,11 @@ struct BinOp {
 };
 
 struct UnOp {
+	LocT loc_;
 	template <typename F>
 	void as_int(F functor, int &val) const {
 		val = functor(val);
 	}
-};
-
-struct BlockList : public Expr {
-private:
-	std::unique_ptr<BlockList> blocks_;
-	std::unique_ptr<Expr> block_;
-public:
-	BlockList(BlockList *blocks, Expr *block) : blocks_(blocks), block_(block) {
-		block_->parent_ = blocks_->parent_ = this;
-	}
-	const Expr *eval(Context &ctxt) const override;
 };
 
 struct DeclList : public INode {
@@ -73,7 +64,7 @@ public:
 	auto size() const {
 		return cner_.size();
 	}
-	auto push_back(const std::string &x) {
+	auto push_back(std::string &&x) {
 		return cner_.push_back(x);
 	}
 };
@@ -83,7 +74,11 @@ private:
 	std::unique_ptr<ExprList> tail_;
 	std::unique_ptr<Expr> head_;
 public:
-	ExprList(ExprList *tail, Expr *head) : tail_(tail), head_(head) {
+	ExprList(LocT loc, INode *tail, INode *head) :
+		Expr(loc),
+		tail_(static_cast<ExprList *>(tail)),
+		head_(static_cast<Expr *>(head))
+	{
 		head_->parent_ = this;
 		if (tail_)
 			tail_->parent_ = this;
@@ -95,14 +90,18 @@ public:
 };
 
 struct Empty : public Expr {
-	const Expr *eval(Context &ctxt) const override; 
+	Empty(LocT loc) : Expr(loc) {}
+	const Expr *eval(Context &ctxt) const override;
 };
 
 struct Scope : public Expr {
 private:
-	std::unique_ptr<BlockList> blocks;
+	std::unique_ptr<Expr> blocks_;
 public:
-	Scope(BlockList *b) : blocks(b) {
+	Scope(LocT loc, INode *blocks) :
+		Expr(loc),
+		blocks_(static_cast<Expr *>(blocks))
+	{
 		blocks->parent_ = this;
 	}
 	const Expr *eval(Context &ctxt) const override; 
@@ -113,7 +112,11 @@ private:
 	std::unique_ptr<Expr> fst_;
 	std::unique_ptr<Expr> snd_;
 public:
-	Seq(Expr *fst, Expr *snd) : fst_(fst), snd_(snd) {
+	Seq(LocT loc, INode *fst, INode *snd) :
+		Expr(loc),
+		fst_(static_cast<Expr *>(fst)),
+		snd_(static_cast<Expr *>(snd))
+	{
 		fst_->parent_ = snd_->parent_ = this;
 	}
 	const Expr *eval(Context &ctxt) const override; 
@@ -124,7 +127,11 @@ private:
 	std::unique_ptr<Expr> expr_;
 	std::unique_ptr<Expr> block_;
 public:
-	While(Expr *e, Expr *b) : expr_(e), block_(b) {
+	While(LocT loc, INode *expr, INode *block) :
+		Expr(loc),
+		expr_(static_cast<Expr *>(expr)),
+		block_(static_cast<Expr *>(block))
+	{
 		expr_->parent_ = block_->parent_ = this;
 	}
 	const Expr *eval(Context &ctxt) const override;
@@ -136,9 +143,13 @@ private:
 	std::unique_ptr<Expr> true_block_;
 	std::unique_ptr<Expr> false_block_;
 public:
-	If(Expr *e, Expr *tb, Expr *fb) : expr_(e), true_block_(tb), false_block_(fb) {
-		expr_->parent_ = this;
-		true_block_->parent_ = this;
+	If(LocT loc, INode *expr, INode *tb, INode *fb = nullptr) :
+		Expr(loc),
+		expr_(static_cast<Expr *>(expr)),
+		true_block_(static_cast<Expr *>(tb)),
+		false_block_(static_cast<Expr *>(fb))
+	{
+		expr_->parent_ = true_block_->parent_ = this;
 		if (false_block_)
 			false_block_->parent_ = this;
 	}
@@ -149,7 +160,10 @@ struct Return : public Expr {
 private:
 	std::unique_ptr<Expr> expr_;
 public:
-	Return(Expr *expr) : expr_(expr) {
+	Return(LocT loc, INode *expr) :
+		Expr(loc),
+		expr_(static_cast<Expr *>(expr))
+	{
 		expr_->parent_ = this;
 	}
 	const Expr *eval(Context &ctxt) const override;
@@ -159,14 +173,18 @@ struct ExprInt : public Expr {
 private:
 	int val_;
 public:
-	ExprInt(int i) : val_(i)
+	ExprInt(LocT loc, int i) :
+		Expr(loc),
+		val_(i)
 	{}
 	const Expr *eval(Context &ctxt) const override;
 };
 
 struct ExprId : public Expr {
 	std::string name_;
-	ExprId(std::string n) : name_(n)
+	ExprId(LocT loc, std::string n) :
+		Expr(loc),
+		name_(n)
 	{}
 	const Expr *eval(Context &ctxt) const override;
 };
@@ -177,21 +195,32 @@ private:
 	std::unique_ptr<DeclList> decls_;
 	std::unique_ptr<ExprId> id_;
 public:
-	ExprFunc(Scope *b, DeclList *d, ExprId *i = nullptr) : body_(b), decls_(d), id_(i) {
+	ExprFunc(LocT loc, INode *body, INode *decls, INode *id = nullptr) :
+		Expr(loc),
+		body_(static_cast<Scope *>(body)),
+		decls_(static_cast<DeclList *>(decls)),
+		id_(static_cast<ExprId *>(id))
+	{
 		body_->parent_ = this;
 	}
 	const Expr *eval(Context &ctxt) const override;
 };
 
 struct ExprQmark : public Expr {
+	ExprQmark(LocT loc) : Expr(loc) {}
 	const Expr *eval(Context &ctxt) const override;
 };
+
 struct ExprAssign : public Expr {
 private:
 	std::unique_ptr<ExprId> id_;
 	std::unique_ptr<Expr> expr_;
 public:
-	ExprAssign(ExprId *i, Expr *e) : id_(i), expr_(e) {
+	ExprAssign(LocT loc, INode *i, INode *e) :
+		Expr(loc),
+		id_(static_cast<ExprId *>(i)),
+		expr_(static_cast<Expr *>(e))
+	{
 		id_->parent_ = expr_->parent_ = this;
 	}
 	const Expr *eval(Context &ctxt) const override;
@@ -199,10 +228,15 @@ public:
 
 struct ExprApply : public Expr {
 private:
+	LocT loc_;
 	std::unique_ptr<ExprId> id_;
 	std::unique_ptr<ExprList> ops_;
 public:
-	ExprApply(ExprId *i, ExprList *o) : id_(i), ops_(o) {
+	ExprApply(LocT loc, INode *i, INode *o) :
+		Expr(loc),
+		id_(static_cast<ExprId *>(i)),
+		ops_(static_cast<ExprList *>(o))
+	{
 		id_->parent_ = this;
 		if (ops_)
 			ops_->parent_ = this;
@@ -217,7 +251,11 @@ private:
 	std::unique_ptr<Expr> lhs_;
 	std::unique_ptr<Expr> rhs_;
 public:
-	ExprBinOp(Expr *l, Expr *r) : lhs_(l), rhs_(r) {
+	ExprBinOp(LocT loc, INode *l, INode *r) :
+		Expr(loc),
+		lhs_(static_cast<Expr *>(l)),
+		rhs_(static_cast<Expr *>(r))
+	{
 		lhs_->parent_ = rhs_->parent_ = this;
 	}
 	const Expr *eval(Context &ctxt) const {
@@ -225,7 +263,7 @@ public:
 			return lhs_.get();
 		if (ctxt.prev == lhs_.get())
 			return rhs_.get();
-		auto &&r = std::move(ctxt.res.back());
+		auto r = std::move(ctxt.res.back());
 		ctxt.res.pop_back();
 		auto &&l = std::move(ctxt.res.back());
 		ctxt.res.back() = op_(l, r);
@@ -239,7 +277,10 @@ private:
 	T op_;
 	std::unique_ptr<Expr> rhs_;
 public:
-	ExprUnOp(Expr *r) : rhs_(r) {
+	ExprUnOp(LocT loc, INode *r) :
+		Expr(loc),
+		rhs_(static_cast<Expr *>(r))
+	{
 		rhs_->parent_ = this;
 	}
 	const Expr *eval(Context &ctxt) const override {
