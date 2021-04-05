@@ -164,7 +164,10 @@ const Expr *ExprApply::eval(Context &ctxt) const {
 const Expr *ExprQmark::eval(Context &ctxt) const {
 	int val;
 	std::cin >> val;
-	ctxt.res.emplace_back(loc_, val);
+	if (std::cin.fail())
+		ctxt.res.emplace_back();
+	else
+		ctxt.res.emplace_back(loc_, val);
 	return parent_;
 }
 
