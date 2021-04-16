@@ -91,6 +91,11 @@ const Expr *ExprInt::eval(Context &ctxt) const {
 	return parent_;
 }
 
+const Expr *ExprFloat::eval(Context &ctxt) const {
+	ctxt.res.emplace_back(loc_, val_);
+	return parent_;
+}
+
 const Expr *ExprId::eval(Context &ctxt) const {
 	for (auto it = ctxt.scope_stack.rbegin(), end = ctxt.scope_stack.rend(); it != end; ++it) {
 		auto var = it->find(name_);

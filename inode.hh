@@ -16,11 +16,6 @@ inline INode *make<DeclList>(INode *declist, INode *id) {
 }
 
 template <>
-inline INode *make<ExprList>(LocT loc, INode *exprlist, INode *expr) {
-	return new ExprList{loc, static_cast<ExprList *>(exprlist), static_cast<Expr *>(expr)};
-}
-
-template <>
 inline INode *make<ExprList>() {
 	return nullptr;
 }

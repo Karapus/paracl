@@ -56,6 +56,10 @@ id	[a-zA-Z_][a-zA-Z_0-9]*
 ";"		return yy::parser::token::TOK_SEMICOLON;
 ":"		return yy::parser::token::TOK_COLON;
 ","		return yy::parser::token::TOK_COMA;
+{num}"."[0-9]+ {
+		*yylval = AST::make<AST::ExprFloat>(*yyloc, std::stod(YYText()));
+		return yy::parser::token::TOK_FLOAT;
+	}
 {num}	{
 		*yylval = AST::make<AST::ExprInt>(*yyloc, std::stoi(YYText()));
 		return yy::parser::token::TOK_NUM;

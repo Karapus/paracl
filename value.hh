@@ -1,6 +1,7 @@
 #pragma once
 #include "location.hh"
 #include <ostream>
+#include <variant>
 
 namespace AST {
 
@@ -47,6 +48,10 @@ public:
 struct IValue {
 	virtual operator int() const = 0;
 	virtual operator int&() & = 0;
+
+	virtual operator double() const = 0;
+	virtual operator double&() & = 0;
+
 	virtual operator Func() const = 0;
 	virtual operator Func&() & = 0;
 	virtual IValue *clone() const = 0;
@@ -56,9 +61,34 @@ struct IValue {
 	virtual ~IValue() = default;
 };
 
-struct IntValue : public IValue {
-private:
+struct LocIValue : public IValue{
+protected:
 	LocT origin_;
+	LocIValue(LocT loc) : origin_(loc) {
+	}
+public:
+	virtual operator int() const {
+		throw IncorrectTypeExcept{origin_};
+	}
+	virtual operator int&() & {
+		throw IncorrectTypeExcept{origin_};
+	}
+	virtual operator double() const {
+		throw IncorrectTypeExcept{origin_};
+	}
+	virtual operator double&() & {
+		throw IncorrectTypeExcept{origin_};
+	}
+	virtual operator Func() const {
+		throw IncorrectTypeExcept{origin_};
+	}
+	virtual operator Func&() & {
+		throw IncorrectTypeExcept{origin_};
+	}
+};
+
+struct IntValue : public LocIValue {
+private:
 	int val_;
 public:
 	operator int() const override {
@@ -67,31 +97,41 @@ public:
 	operator int&() & override {
 		return val_;
 	}
-	operator Func() const override {
-		throw IncorrectTypeExcept{origin_};
-	}
-	operator Func&() & override {
-		throw IncorrectTypeExcept{origin_};
+	operator double() const override {
+		return val_;
 	}
 	IntValue *clone() const override {
 		return new IntValue(origin_, val_);
 	}
-	IntValue(LocT loc, int val) : origin_(loc), val_(val) {
+	IntValue(LocT loc, int val) : LocIValue(loc), val_(val) {
+	}
+};
+
+struct FloatValue : public LocIValue {
+private:
+	double val_;
+public:
+	operator double() const override {
+		return val_;
+	}
+	operator double&() & override {
+		return val_;
+	}
+	operator int() const override {
+		return val_;
+	}
+	FloatValue *clone() const override {
+		return new FloatValue(origin_, val_);
+	}
+	FloatValue(LocT loc, double val) : LocIValue(loc), val_(val) {
 	}
 };
 
 
-struct FuncValue : public IValue {
+struct FuncValue : public LocIValue {
 private:
-	LocT origin_;
 	Func func_;
 public:
-	operator int() const override {
-		throw IncorrectTypeExcept{origin_};
-	}
-	operator int&() & override {
-		throw IncorrectTypeExcept{origin_};
-	}
 	operator Func() const override {
 		return func_;
 	}
@@ -101,7 +141,7 @@ public:
 	FuncValue *clone() const override {
 		return new FuncValue{origin_, func_};
 	}
-	FuncValue(LocT loc, Func f)  : origin_(loc), func_(f) {
+	FuncValue(LocT loc, Func f)  : LocIValue(loc), func_(f) {
 	}
 };
 
@@ -113,6 +153,12 @@ public:
 		throw UdefValExcept{};
 	}
 	operator int&() & override {
+		throw UdefValExcept{};
+	}
+	operator double() const override {
+		throw UdefValExcept{};
+	}
+	operator double&() & override {
 		throw UdefValExcept{};
 	}
 	operator Func() const override {
@@ -133,6 +179,7 @@ public:
 	DefaultValue(const DefaultValue &) = delete;
 	DefaultValue &operator = (const DefaultValue &) = delete;
 };
+
 } //namespace Values
 
 struct Value {
@@ -162,15 +209,13 @@ public:
 	}
 	Value(LocT loc, Func val) : ptr_(new Values::FuncValue(loc, val)) {
 	}
-	operator int&() & {
-		return static_cast<int &>(*ptr_);
-	}
-	operator Func&() & {
-		return static_cast<Func &>(*ptr_);
-	}
 	template <typename T>
 	operator T() const {
 		return static_cast<T>(*ptr_);
+	}
+	template <typename T>
+	operator decltype(static_cast<T&>(*ptr_))() & {
+		return static_cast<T&>(*ptr_);
 	}
 	operator bool() const {
 		return static_cast<int>(*ptr_);

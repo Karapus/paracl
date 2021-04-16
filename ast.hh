@@ -37,17 +37,35 @@ struct Expr : public INode {
 
 struct BinOp {
 	LocT loc_;
-	template <typename F>
-	void as_int(F functor, int &lhs, int rhs) const {
-		lhs = functor(lhs, rhs);
+	template <typename T, typename F>
+	void as(F functor, const Value& lhs, const Value& rhs) const {
+		lhs.operator T&() = functor(static_cast<T>(lhs), static_cast<T>(rhs));
+	}
+	template <typename T, typename... Ts, typename F, typename... Fs>
+	auto as(F functor, Fs... funs, Value& lhs, const Value& rhs) const
+		-> decltype(as<Ts...>(funs..., lhs, rhs)) {
+		try {
+			as<T>(functor, lhs, rhs);
+		} catch (const Values::IncorrectTypeExcept &) {
+			as<Ts...>(funs..., lhs, rhs);
+		}
 	}
 };
 
 struct UnOp {
 	LocT loc_;
-	template <typename F>
-	void as_int(F functor, int &val) const {
-		val = functor(val);
+	template <typename T, typename F>
+	void as(F functor, Value& val) const {
+		val.operator T&() = functor(static_cast<T>(val));
+	}
+	template <typename T, typename... Ts, typename F, typename... Fs>
+	auto as(F functor, Fs... funs, Value& val) const
+		-> decltype(as<Ts...>(funs..., val)) {
+		try {
+			as<T>(functor, val);
+		} catch (const Values::IncorrectTypeExcept &) {
+			as<Ts...>(funs..., val);
+		}
 	}
 };
 
@@ -180,6 +198,17 @@ public:
 	const Expr *eval(Context &ctxt) const override;
 };
 
+struct ExprFloat : public Expr {
+private:
+	double val_;
+public:
+	ExprFloat(LocT loc, double d) :
+		Expr(loc),
+		val_(d)
+	{}
+	const Expr *eval(Context &ctxt) const override;
+};
+
 struct ExprId : public Expr {
 	std::string name_;
 	ExprId(LocT loc, std::string n) :
@@ -293,104 +322,104 @@ public:
 
 struct BinOpMul : public BinOp {
 	Value operator() (Value lhs, const Value &rhs) const {
-		as_int(std::multiplies<int>{}, lhs, rhs);
+		as<int>(std::multiplies<int>{}, lhs, rhs);
 		return lhs;
 	}
 };
 struct BinOpDiv : public BinOp {
 	Value operator() (Value lhs, const Value &rhs) const {
-		as_int(std::divides<int>{}, lhs, rhs);
+		as<int>(std::divides<int>{}, lhs, rhs);
 		return lhs;
 	}
 };
 struct BinOpMod : public BinOp {
 	Value operator() (Value lhs, const Value &rhs) const {
-		as_int(std::modulus<int>{}, lhs, rhs);
+		as<int>(std::modulus<int>{}, lhs, rhs);
 		return lhs;
 	}
 };
 struct BinOpPlus : public BinOp {
 	Value operator() (Value lhs, const Value &rhs) const {
-		as_int(std::plus<int>{}, lhs, rhs);
+		as<int>(std::plus<int>{}, lhs, rhs);
 		return lhs;
 	}
 };
 struct BinOpMinus : public BinOp {
 	Value operator() (Value lhs, const Value &rhs) const {
-		as_int(std::minus<int>{}, lhs, rhs);
+		as<int>(std::minus<int>{}, lhs, rhs);
 		return lhs;
 	}
 };
 struct BinOpLess : public BinOp {
 	Value operator() (Value lhs, const Value &rhs) const {
-		as_int(std::less<int>{}, lhs, rhs);
+		as<int>(std::less<int>{}, lhs, rhs);
 		return lhs;
 	}
 };
 struct BinOpGrtr : public BinOp {
 	Value operator() (Value lhs, const Value &rhs) const {
-		as_int(std::greater<int>{}, lhs, rhs);
+		as<int>(std::greater<int>{}, lhs, rhs);
 		return lhs;
 	}
 };
 struct BinOpLessOrEq : public BinOp {
 	Value operator() (Value lhs, const Value &rhs) const {
-		as_int(std::less_equal<int>{}, lhs, rhs);
+		as<int>(std::less_equal<int>{}, lhs, rhs);
 		return lhs;
 	}
 };
 struct BinOpGrtrOrEq : public BinOp {
 	Value operator() (Value lhs, const Value &rhs) const {
-		as_int(std::greater_equal<int>{}, lhs, rhs);
+		as<int>(std::greater_equal<int>{}, lhs, rhs);
 		return lhs;
 	}
 };
 struct BinOpEqual : public BinOp {
 	Value operator() (Value lhs, const Value &rhs) const {
-		as_int(std::equal_to<int>{}, lhs, rhs);
+		as<int>(std::equal_to<int>{}, lhs, rhs);
 		return lhs;
 	}
 };
 struct BinOpNotEqual : public BinOp {
 	Value operator() (Value lhs, const Value &rhs) const {
-		as_int(std::not_equal_to<int>{}, lhs, rhs);
+		as<int>(std::not_equal_to<int>{}, lhs, rhs);
 		return lhs;
 	}
 };
 struct BinOpAnd : public BinOp {
 	Value operator() (Value lhs, const Value &rhs) const {
-		as_int(std::logical_and<int>{}, lhs, rhs);
+		as<int>(std::logical_and<int>{}, lhs, rhs);
 		return lhs;
 	}
 };
 struct BinOpOr : public BinOp {
 	Value operator() (Value lhs, const Value &rhs) const {
-		as_int(std::logical_or<int>{}, lhs, rhs);
+		as<int>(std::logical_or<int>{}, lhs, rhs);
 		return lhs;
 	}
 };
 
 struct UnOpPlus : public UnOp {
 	Value operator() (Value val) const {
-		as_int([](int a) { return +a; }, val);
+		as<int>([](int a) { return +a; }, val);
 		return val;
 	}
 };
 struct UnOpMinus : public UnOp {
 	Value operator() (Value val) const {
-		as_int(std::negate<int>{}, val);
+		as<int>(std::negate<int>{}, val);
 		return val;
 	}
 };
 struct UnOpNot : public UnOp {
 	Value operator() (Value val) const {
-		as_int(std::logical_not<int>{}, val);
+		as<int>(std::logical_not<int>{}, val);
 		return val;
 	}
 };
 struct UnOpPrint : public UnOp {
 	Value operator() (Value val) const {
-		as_int([](int a) {std::cout << a << std::endl; return a; }, val);
+		as<int>([](int a) {std::cout << a << std::endl; return a; }, val);
 		return val;
 	}
 };

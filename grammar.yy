@@ -54,12 +54,13 @@
 	SEMICOLON
 	COLON
 	COMA
+	FLOAT
 	NUM
 	ID
 	FUNC
 	RETURN
 
-%destructor { delete $$; } ID NUM scope blocks block
+%destructor { delete $$; } ID NUM FLOAT scope blocks block
 	stm cexpr fexpr expr func declist decls
 	applist exprs
 
@@ -100,6 +101,7 @@ stm	: scope						{ $$ = $1;	}
 
 cexpr	: LPAR aexpr RPAR	{ $$ = $2; 	}
 	| NUM			{ $$ = $1;	}
+	| FLOAT			{ $$ = $1;	}
 	| ID			{ $$ = $1;	}
 	| QMARK			{ $$ = make<ExprQmark>(@$);			}
 	| RETURN expr		{ $$ = make<Return>(@$, $2);			}
