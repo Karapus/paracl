@@ -1,7 +1,9 @@
 #pragma once
 #include "location.hh"
+#include <optional>
 #include <ostream>
-#include <variant>
+#include <typeinfo>
+#include <utility>
 
 namespace AST {
 
@@ -207,6 +209,8 @@ public:
 	}
 	Value(LocT loc, int val) : ptr_(new Values::IntValue(loc, val)) {
 	}
+	Value(LocT loc, double val) : ptr_(new Values::IntValue(loc, val)) {
+	}
 	Value(LocT loc, Func val) : ptr_(new Values::FuncValue(loc, val)) {
 	}
 	template <typename T>
@@ -220,8 +224,45 @@ public:
 	operator bool() const {
 		return static_cast<int>(*ptr_);
 	}
+	template <typename T>
+	bool isSameType() const {
+		return typeid(*ptr_) == typeid((*Value{LocT{}, T{}}.ptr_));
+	}
 	~Value() {
 		ptr_->free();
 	}
 };
+
+namespace Values {
+
+template <typename T, typename Arg>
+auto get(Arg arg) {
+	return arg.template isSameType<T>() ? std::make_optional<Arg>(arg) : std::nullopt;
+}
+
+template <typename T, typename Arg, typename... Args>
+auto get(Arg arg, Args... args) {
+	return arg.template isSameType<T>() ? std::make_optional<Arg>(arg) : get<T>(args...);
+}
+
+}
+
+template <template <typename> typename F, typename T, typename... Args>
+auto apply(Args... args) {
+	auto res = Values::get<T>(args...);
+	if (res)
+		res->operator T&() = F<T>{}(static_cast<T>(args)...);
+	return res;
+}
+
+template <template <typename> typename F, typename T, typename... Ts, typename... Args>
+auto apply(Args... args) -> decltype(apply<F, Ts...>(args...)) {
+	auto res = apply<F, T>(args...);
+	return res ? res : apply<F, Ts...>(args...);
+}
+
+template <template <typename> typename F, typename... Args>
+auto apply_dflt(Args... args) {
+	return apply<F, int>(args...);
+}
 }

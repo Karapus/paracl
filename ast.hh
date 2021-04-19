@@ -35,40 +35,6 @@ struct Expr : public INode {
 	virtual const Expr *eval(Context &ctxt) const = 0;
 };
 
-struct BinOp {
-	LocT loc_;
-	template <typename T, typename F>
-	void as(F functor, const Value& lhs, const Value& rhs) const {
-		lhs.operator T&() = functor(static_cast<T>(lhs), static_cast<T>(rhs));
-	}
-	template <typename T, typename... Ts, typename F, typename... Fs>
-	auto as(F functor, Fs... funs, Value& lhs, const Value& rhs) const
-		-> decltype(as<Ts...>(funs..., lhs, rhs)) {
-		try {
-			as<T>(functor, lhs, rhs);
-		} catch (const Values::IncorrectTypeExcept &) {
-			as<Ts...>(funs..., lhs, rhs);
-		}
-	}
-};
-
-struct UnOp {
-	LocT loc_;
-	template <typename T, typename F>
-	void as(F functor, Value& val) const {
-		val.operator T&() = functor(static_cast<T>(val));
-	}
-	template <typename T, typename... Ts, typename F, typename... Fs>
-	auto as(F functor, Fs... funs, Value& val) const
-		-> decltype(as<Ts...>(funs..., val)) {
-		try {
-			as<T>(functor, val);
-		} catch (const Values::IncorrectTypeExcept &) {
-			as<Ts...>(funs..., val);
-		}
-	}
-};
-
 struct DeclList : public INode {
 private:
 	std::vector<std::string> cner_;
@@ -320,106 +286,107 @@ public:
 	}
 };
 
-struct BinOpMul : public BinOp {
-	Value operator() (Value lhs, const Value &rhs) const {
-		as<int>(std::multiplies<int>{}, lhs, rhs);
+struct BinOpMul {
+	Value operator() (Value lhs, Value rhs) const {
+		return *apply_dflt<std::multiplies>(lhs, rhs);
+	}
+};
+struct BinOpDiv {
+	Value operator() (Value lhs, Value rhs) const {
+		return *apply_dflt<std::divides>(lhs, rhs);
+	}
+};
+struct BinOpMod {
+	Value operator() (Value lhs, Value rhs) const {
+		return *apply<std::modulus, int>(lhs, rhs);
 		return lhs;
 	}
 };
-struct BinOpDiv : public BinOp {
-	Value operator() (Value lhs, const Value &rhs) const {
-		as<int>(std::divides<int>{}, lhs, rhs);
+struct BinOpPlus {
+	Value operator() (Value lhs, Value rhs) const {
+		return *apply_dflt<std::plus>(lhs, rhs);
+	}
+};
+struct BinOpMinus {
+	Value operator() (Value lhs, Value rhs) const {
+		return *apply_dflt<std::minus>(lhs, rhs);
+	}
+};
+struct BinOpLess {
+	Value operator() (Value lhs, Value rhs) const {
+		return *apply_dflt<std::less>(lhs, rhs);
+	}
+};
+struct BinOpGrtr {
+	Value operator() (Value lhs, Value rhs) const {
+		return *apply_dflt<std::greater>(lhs, rhs);
+	}
+};
+struct BinOpLessOrEq {
+	Value operator() (Value lhs, Value rhs) const {
+		return *apply_dflt<std::less_equal>(lhs, rhs);
+	}
+};
+struct BinOpGrtrOrEq {
+	Value operator() (Value lhs, Value rhs) const {
+		return *apply_dflt<std::greater_equal>(lhs, rhs);
+	}
+};
+struct BinOpEqual {
+	Value operator() (Value lhs, Value rhs) const {
+		return *apply_dflt<std::equal_to>(lhs, rhs);
+	}
+};
+struct BinOpNotEqual {
+	Value operator() (Value lhs, Value rhs) const {
+		return *apply_dflt<std::not_equal_to>(lhs, rhs);
+	}
+};
+struct BinOpAnd {
+	Value operator() (Value lhs, Value rhs) const {
+		return *apply_dflt<std::logical_and>(lhs, rhs);
 		return lhs;
 	}
 };
-struct BinOpMod : public BinOp {
-	Value operator() (Value lhs, const Value &rhs) const {
-		as<int>(std::modulus<int>{}, lhs, rhs);
-		return lhs;
-	}
-};
-struct BinOpPlus : public BinOp {
-	Value operator() (Value lhs, const Value &rhs) const {
-		as<int>(std::plus<int>{}, lhs, rhs);
-		return lhs;
-	}
-};
-struct BinOpMinus : public BinOp {
-	Value operator() (Value lhs, const Value &rhs) const {
-		as<int>(std::minus<int>{}, lhs, rhs);
-		return lhs;
-	}
-};
-struct BinOpLess : public BinOp {
-	Value operator() (Value lhs, const Value &rhs) const {
-		as<int>(std::less<int>{}, lhs, rhs);
-		return lhs;
-	}
-};
-struct BinOpGrtr : public BinOp {
-	Value operator() (Value lhs, const Value &rhs) const {
-		as<int>(std::greater<int>{}, lhs, rhs);
-		return lhs;
-	}
-};
-struct BinOpLessOrEq : public BinOp {
-	Value operator() (Value lhs, const Value &rhs) const {
-		as<int>(std::less_equal<int>{}, lhs, rhs);
-		return lhs;
-	}
-};
-struct BinOpGrtrOrEq : public BinOp {
-	Value operator() (Value lhs, const Value &rhs) const {
-		as<int>(std::greater_equal<int>{}, lhs, rhs);
-		return lhs;
-	}
-};
-struct BinOpEqual : public BinOp {
-	Value operator() (Value lhs, const Value &rhs) const {
-		as<int>(std::equal_to<int>{}, lhs, rhs);
-		return lhs;
-	}
-};
-struct BinOpNotEqual : public BinOp {
-	Value operator() (Value lhs, const Value &rhs) const {
-		as<int>(std::not_equal_to<int>{}, lhs, rhs);
-		return lhs;
-	}
-};
-struct BinOpAnd : public BinOp {
-	Value operator() (Value lhs, const Value &rhs) const {
-		as<int>(std::logical_and<int>{}, lhs, rhs);
-		return lhs;
-	}
-};
-struct BinOpOr : public BinOp {
-	Value operator() (Value lhs, const Value &rhs) const {
-		as<int>(std::logical_or<int>{}, lhs, rhs);
+struct BinOpOr {
+	Value operator() (Value lhs, Value rhs) const {
+		return *apply_dflt<std::logical_or>(lhs, rhs);
 		return lhs;
 	}
 };
 
-struct UnOpPlus : public UnOp {
+struct UnOpPlus {
+	template <typename T>
+	struct Plus {
+		auto operator() (T a) { return +a; }
+	};
 	Value operator() (Value val) const {
-		as<int>([](int a) { return +a; }, val);
+		return *apply_dflt<Plus>(val);
 		return val;
 	}
 };
-struct UnOpMinus : public UnOp {
+struct UnOpMinus {
 	Value operator() (Value val) const {
-		as<int>(std::negate<int>{}, val);
+		return *apply_dflt<std::negate>( val);
 		return val;
 	}
 };
-struct UnOpNot : public UnOp {
+struct UnOpNot {
 	Value operator() (Value val) const {
-		as<int>(std::logical_not<int>{}, val);
+		return *apply_dflt<std::logical_not>(val);
 		return val;
 	}
 };
-struct UnOpPrint : public UnOp {
+struct UnOpPrint {
+	template <typename T>
+	struct Print {
+		auto operator() (T a) {
+			std::cout << a << std::endl;
+			return a;
+		}
+	};
 	Value operator() (Value val) const {
-		as<int>([](int a) {std::cout << a << std::endl; return a; }, val);
+		return *apply_dflt<Print>(val);
 		return val;
 	}
 };
