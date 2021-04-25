@@ -2,6 +2,7 @@
 #include "location.hh"
 #include <optional>
 #include <ostream>
+#include <type_traits>
 #include <typeinfo>
 #include <utility>
 
@@ -63,89 +64,79 @@ struct IValue {
 	virtual ~IValue() = default;
 };
 
-struct LocIValue : public IValue{
-protected:
-	LocT origin_;
-	LocIValue(LocT loc) : origin_(loc) {
-	}
-public:
-	virtual operator int() const {
-		throw IncorrectTypeExcept{origin_};
-	}
-	virtual operator int&() & {
-		throw IncorrectTypeExcept{origin_};
-	}
-	virtual operator double() const {
-		throw IncorrectTypeExcept{origin_};
-	}
-	virtual operator double&() & {
-		throw IncorrectTypeExcept{origin_};
-	}
-	virtual operator Func() const {
-		throw IncorrectTypeExcept{origin_};
-	}
-	virtual operator Func&() & {
-		throw IncorrectTypeExcept{origin_};
-	}
-};
-
-struct IntValue : public LocIValue {
+template <typename T>
+struct Val : public IValue {
 private:
-	int val_;
+	LocT origin_;
+	T val_;
 public:
 	operator int() const override {
-		return val_;
+		throw IncorrectTypeExcept{origin_};
 	}
 	operator int&() & override {
-		return val_;
+		throw IncorrectTypeExcept{origin_};
 	}
 	operator double() const override {
-		return val_;
-	}
-	IntValue *clone() const override {
-		return new IntValue(origin_, val_);
-	}
-	IntValue(LocT loc, int val) : LocIValue(loc), val_(val) {
-	}
-};
-
-struct FloatValue : public LocIValue {
-private:
-	double val_;
-public:
-	operator double() const override {
-		return val_;
+		throw IncorrectTypeExcept{origin_};
 	}
 	operator double&() & override {
-		return val_;
+		throw IncorrectTypeExcept{origin_};
 	}
-	operator int() const override {
-		return val_;
-	}
-	FloatValue *clone() const override {
-		return new FloatValue(origin_, val_);
-	}
-	FloatValue(LocT loc, double val) : LocIValue(loc), val_(val) {
-	}
-};
-
-
-struct FuncValue : public LocIValue {
-private:
-	Func func_;
-public:
 	operator Func() const override {
-		return func_;
+		throw IncorrectTypeExcept{origin_};
 	}
 	operator Func&() & override {
-		return func_;
+		throw IncorrectTypeExcept{origin_};
 	}
-	FuncValue *clone() const override {
-		return new FuncValue{origin_, func_};
+	Val *clone() const override {
+		return new Val(origin_, val_);
 	}
-	FuncValue(LocT loc, Func f)  : LocIValue(loc), func_(f) {
+	Val(LocT loc, T val) : origin_(loc), val_(val) {
 	}
 };
+
+template <typename T>
+Val(LocT, T) -> Val<T>;
+
+template<>
+inline Val<int>::operator double() const {
+	return val_;
+}
+
+template<>
+inline Val<int>::operator int() const {
+	return val_;
+}
+
+template<>
+inline Val<int>::operator int&() & {
+	return val_;
+}
+
+template<>
+inline Val<double>::operator int() const {
+	return val_;
+}
+
+template<>
+inline Val<double>::operator double() const {
+	return val_;
+}
+
+template<>
+inline Val<double>::operator double&() & {
+	return val_;
+}
+
+template<>
+inline Val<Func>::operator Func() const {
+	return val_;
+}
+
+template<>
+inline Val<Func>::operator Func&() & {
+	return val_;
+}
 
 struct DefaultValue : public IValue {
 private:
@@ -207,26 +198,23 @@ public:
 		std::swap(ptr_, rhs.ptr_);
 		return *this;
 	}
-	Value(LocT loc, int val) : ptr_(new Values::IntValue(loc, val)) {
-	}
-	Value(LocT loc, double val) : ptr_(new Values::IntValue(loc, val)) {
-	}
-	Value(LocT loc, Func val) : ptr_(new Values::FuncValue(loc, val)) {
+	template <typename T>
+	Value(LocT loc, T val) : ptr_(new Values::Val(loc, val)) {
 	}
 	template <typename T>
 	operator T() const {
-		return static_cast<T>(*ptr_);
+		return ptr_->operator T();
 	}
 	template <typename T>
-	operator decltype(static_cast<T&>(*ptr_))() & {
-		return static_cast<T&>(*ptr_);
+	operator decltype(ptr_->operator T&)() & {
+		return ptr_->operator T&();
 	}
 	operator bool() const {
-		return static_cast<int>(*ptr_);
+		return operator int();
 	}
 	template <typename T>
 	bool isSameType() const {
-		return typeid(*ptr_) == typeid((*Value{LocT{}, T{}}.ptr_));
+		return typeid(*ptr_) == typeid(Values::Val<T>);
 	}
 	~Value() {
 		ptr_->free();
@@ -234,6 +222,18 @@ public:
 };
 
 namespace Values {
+
+struct NoConversionExcept : ValueExcept {
+private:
+	LocT loc_;
+public:
+	void print(std::ostream& os) const override {
+		os << "Value of incorrect type declared at " << loc_;
+	}
+	NoConversionExcept(LocT l) : loc_(l) {
+	}
+};
+namespace detail {
 
 template <typename T, typename Arg>
 auto get(Arg arg) {
@@ -245,24 +245,31 @@ auto get(Arg arg, Args... args) {
 	return arg.template isSameType<T>() ? std::make_optional<Arg>(arg) : get<T>(args...);
 }
 
-}
 
 template <template <typename> typename F, typename T, typename... Args>
 auto apply(Args... args) {
-	auto res = Values::get<T>(args...);
+	auto res = get<T>(args...);
 	if (res)
 		res->operator T&() = F<T>{}(static_cast<T>(args)...);
 	return res;
 }
 
 template <template <typename> typename F, typename T, typename... Ts, typename... Args>
-auto apply(Args... args) -> decltype(apply<F, Ts...>(args...)) {
-	auto res = apply<F, T>(args...);
-	return res ? res : apply<F, Ts...>(args...);
+auto apply(Args... args) -> decltype(detail::apply<F, Ts...>(args...)) {
+	auto res = detail::apply<F, T>(args...);
+	return res ? res : detail::apply<F, Ts...>(args...);
+}
+}
+}
+
+template <template <typename> typename F, typename... Ts, typename... Args>
+auto apply(Args... args)
+	-> decltype(Values::detail::apply<F, Ts...>(args...)) {
+	return Values::detail::apply<F, Ts...>(args...);
 }
 
 template <template <typename> typename F, typename... Args>
-auto apply_dflt(Args... args) {
-	return apply<F, int>(args...);
+auto apply(Args... args) {
+	return Values::detail::apply<F, double, int>(args...);
 }
 }

@@ -2,6 +2,7 @@
 #include "value.hh"
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 #include <functional>
 #include <memory>
@@ -260,8 +261,12 @@ public:
 			return rhs_.get();
 		auto r = std::move(ctxt.res.back());
 		ctxt.res.pop_back();
-		auto &&l = std::move(ctxt.res.back());
-		ctxt.res.back() = op_(l, r);
+		auto&& l = std::move(ctxt.res.back());
+		auto&& res = op_(std::move(l), std::move(r));
+		if (res)
+			ctxt.res.back() = std::move(*res);
+		else
+			throw Values::NoConversionExcept{loc_};
 		return parent_;
 	}
 };
@@ -281,77 +286,78 @@ public:
 	const Expr *eval(Context &ctxt) const override {
 		if (ctxt.prev == parent_)
 			return rhs_.get();
-		ctxt.res.back() = op_(std::move(ctxt.res.back()));
+		auto&& res = op_(std::move(ctxt.res.back()));
+		if (res)
+			ctxt.res.back() = std::move(*res);
+		else
+			throw Values::NoConversionExcept{loc_};
 		return parent_;
 	}
 };
 
 struct BinOpMul {
-	Value operator() (Value lhs, Value rhs) const {
-		return *apply_dflt<std::multiplies>(lhs, rhs);
+	auto operator() (Value lhs, Value rhs) const {
+		return apply<std::multiplies>(lhs, rhs);
 	}
 };
 struct BinOpDiv {
-	Value operator() (Value lhs, Value rhs) const {
-		return *apply_dflt<std::divides>(lhs, rhs);
+	auto operator() (Value lhs, Value rhs) const {
+		return apply<std::divides>(lhs, rhs);
 	}
 };
 struct BinOpMod {
-	Value operator() (Value lhs, Value rhs) const {
-		return *apply<std::modulus, int>(lhs, rhs);
-		return lhs;
+	auto operator() (Value lhs, Value rhs) const {
+		return apply<std::modulus, int>(lhs, rhs);
 	}
 };
 struct BinOpPlus {
-	Value operator() (Value lhs, Value rhs) const {
-		return *apply_dflt<std::plus>(lhs, rhs);
+	auto operator() (Value lhs, Value rhs) const {
+		return apply<std::plus>(lhs, rhs);
 	}
 };
 struct BinOpMinus {
-	Value operator() (Value lhs, Value rhs) const {
-		return *apply_dflt<std::minus>(lhs, rhs);
+	auto operator() (Value lhs, Value rhs) const {
+		return apply<std::minus>(lhs, rhs);
 	}
 };
 struct BinOpLess {
-	Value operator() (Value lhs, Value rhs) const {
-		return *apply_dflt<std::less>(lhs, rhs);
+	auto operator() (Value lhs, Value rhs) const {
+		return apply<std::less>(lhs, rhs);
 	}
 };
 struct BinOpGrtr {
-	Value operator() (Value lhs, Value rhs) const {
-		return *apply_dflt<std::greater>(lhs, rhs);
+	auto operator() (Value lhs, Value rhs) const {
+		return apply<std::greater>(lhs, rhs);
 	}
 };
 struct BinOpLessOrEq {
-	Value operator() (Value lhs, Value rhs) const {
-		return *apply_dflt<std::less_equal>(lhs, rhs);
+	auto operator() (Value lhs, Value rhs) const {
+		return apply<std::less_equal>(lhs, rhs);
 	}
 };
 struct BinOpGrtrOrEq {
-	Value operator() (Value lhs, Value rhs) const {
-		return *apply_dflt<std::greater_equal>(lhs, rhs);
+	auto operator() (Value lhs, Value rhs) const {
+		return apply<std::greater_equal>(lhs, rhs);
 	}
 };
 struct BinOpEqual {
-	Value operator() (Value lhs, Value rhs) const {
-		return *apply_dflt<std::equal_to>(lhs, rhs);
+	auto operator() (Value lhs, Value rhs) const {
+		return apply<std::equal_to>(lhs, rhs);
 	}
 };
 struct BinOpNotEqual {
-	Value operator() (Value lhs, Value rhs) const {
-		return *apply_dflt<std::not_equal_to>(lhs, rhs);
+	auto operator() (Value lhs, Value rhs) const {
+		return apply<std::not_equal_to>(lhs, rhs);
 	}
 };
 struct BinOpAnd {
-	Value operator() (Value lhs, Value rhs) const {
-		return *apply_dflt<std::logical_and>(lhs, rhs);
-		return lhs;
+	auto operator() (Value lhs, Value rhs) const {
+		return apply<std::logical_and>(lhs, rhs);
 	}
 };
 struct BinOpOr {
-	Value operator() (Value lhs, Value rhs) const {
-		return *apply_dflt<std::logical_or>(lhs, rhs);
-		return lhs;
+	auto operator() (Value lhs, Value rhs) const {
+		return apply<std::logical_or>(lhs, rhs);
 	}
 };
 
@@ -360,21 +366,18 @@ struct UnOpPlus {
 	struct Plus {
 		auto operator() (T a) { return +a; }
 	};
-	Value operator() (Value val) const {
-		return *apply_dflt<Plus>(val);
-		return val;
+	auto operator() (Value val) const {
+		return apply<Plus>(val);
 	}
 };
 struct UnOpMinus {
-	Value operator() (Value val) const {
-		return *apply_dflt<std::negate>( val);
-		return val;
+	auto operator() (Value val) const {
+		return apply<std::negate>(val);
 	}
 };
 struct UnOpNot {
-	Value operator() (Value val) const {
-		return *apply_dflt<std::logical_not>(val);
-		return val;
+	auto operator() (Value val) const {
+		return apply<std::logical_not>(val);
 	}
 };
 struct UnOpPrint {
@@ -385,9 +388,8 @@ struct UnOpPrint {
 			return a;
 		}
 	};
-	Value operator() (Value val) const {
-		return *apply_dflt<Print>(val);
-		return val;
+	auto operator() (Value val) const {
+		return apply<Print>(val);
 	}
 };
 }
